@@ -1,28 +1,33 @@
-(ns lift.t.interface)
+(ns lift.t.interface
+  (:require
+   [lift.t.signatures :as sig]))
 
 ;; requirements of interfaces:
 ;; type syntax parser & ast
 ;; pattern matching for impl?
+;; what is the type of a thing at runtime?
+;; does it matter that the underlying system has a different type?
 
 (def interfaces (atom {}))
 
 (defn- add-interface! [type fn-list])
 (defn- add-impl! [type impl fn-list])
-(defn- get-impl [f x])
+
+(defn- get-impl [f arglist]
+  (get @interfaces f)
+  )
 
 (defmacro interface
   {:style/indent :defn}
   [t & fn-list-defaults?]
-  (let [sig-map  (partition-all 2 fn-list-defaults?)
-        default? (last sig-map)
-        defaults (and (= 1 (count default?))
-                      (seq? (first default?))
-                      (= 'default (ffirst default?))
-                      (nfirst default?)) ;; not best parsing here
-        sig-map  (if defaults (butlast sig-map) sig-map)])
-  )
-
-(nfirst '((default (= []) (not=))))
+  (let [fns (sig/parse-fn-list-default fn-list-defaults?)]
+    (->> fns
+         (map (fn [[f {:keys [sig impl]}]]
+                (let [arglist (sig/arglist sig)]
+                  `(defn ~f ~arglist
+                     (let [impl# (or (get-impl ~f ~arglist) ~impl)]
+                       (apply impl# ~@arglist))))))
+         (cons 'do))))
 
 (defmacro impl {:style/indent :defn} [& decl])
 
@@ -33,7 +38,7 @@
   (show [a] (str a)))
 
 (interface (Read a)
-  (read [String] -> a))
+  read (String -> a))
 
 (impl (Read Int)
   (read [s] (Integer. s)))

@@ -2,18 +2,15 @@
   (:refer-clojure :exclude [case])
   (:require
    [clojure.set :refer [difference union]]
-   [parse :refer [parse]]
-   [pattern :as p]
-   [type :refer :all]
-   [util :refer :all]
+   [lift.lang.pattern :as p]
+   [lift.lang.type :refer :all]
+   [lift.lang.util :refer :all]
    [clojure.walk :as walk]
    [clojure.string :as string])
   (:import
-   [type
-    Env Scheme Substitution
-    Unit Const Var Arrow Container Record RowEmpty Row
-    Literal Symbol Lambda Apply Let If
-    Select Extend Restrict]))
+   [lift.lang.type
+    Apply Arrow Const Container Env Extend If Lambda Let Literal Record Restrict
+    Row RowEmpty Scheme Select Substitution Symbol Unit Var]))
 
 (defn occurs? [x expr]
   (contains? (ftv expr) x))

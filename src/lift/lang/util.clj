@@ -1,4 +1,4 @@
-(ns util)
+(ns lift.lang.util)
 
 (defn ns-qualify
   "Qualify symbol s by resolving it or using the current *ns*."

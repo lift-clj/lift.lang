@@ -1,12 +1,11 @@
-(ns type
+(ns lift.lang.type
   (:refer-clojure :exclude [case def])
   (:require
    [clojure.set :refer [difference union]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
-   [util :refer :all]
+   [lift.lang.util :refer :all]
    [clojure.walk :as walk]
-   [type :as t]
    [clojure.set :as set]
    [clojure.java.io :as io]))
 
@@ -463,14 +462,13 @@
                    (let [ns    (range 0 n)
                          vars  (mapv (comp symbol str char (partial + fst)) ns)
                          tuple (apply list (symbol (str "Tuple" n)) vars)]
-                     `((t/def  ~tuple)
+                     `((lift.lang.type/def  ~tuple)
                        ~@(apply concat
                                 (for [[n2 a] (map vector ns vars)]
                                   (let [proj (symbol (str "proj-" n \- n2))]
-                                    `((t/def ~proj ~(list tuple '-> a))
+                                    `((lift.lang.type/def ~proj ~(list tuple '-> a))
                                       (defn ~proj [~'x]
                                         (nth ~'x ~n2)))))))))))))
-
 (def-tuples)
 
 (defn unmatched-case-error []
@@ -610,7 +608,7 @@
       (prn (io/resource path)))
     (when (seq more) (recur more))))
 
-(t/prim Symbol)
-(type/def t/unmatched-case-error a)
-(type/def def (Symbol -> a -> ()))
-(type/def restrict (l -> {l a | r} ->  {| r}))
+(prim Symbol)
+(lift.lang.type/def t/unmatched-case-error a)
+(lift.lang.type/def def (Symbol -> a -> ()))
+(lift.lang.type/def restrict (l -> {l a | r} ->  {| r}))

@@ -1,7 +1,8 @@
 (ns lift.t.signatures
   (:require
    [clojure.spec.alpha :as s]
-   [clojure.string :as string]))
+   [clojure.string :as string]
+   [lift.type :refer :all]))
 
 ;; a, b, c, etc.
 (s/def ::var
@@ -59,15 +60,11 @@
 
 (defn parse-type-expr [[t x]]
   (case t
-    :var       {:type :var   :value x}
-    :vargs     {:type :vargs :value (trim-vargs x)}
-    :type-name {:type :name  :value x}
-    :type-app  {:type :app
-                :op   (parse-type-expr (:op x))
-                :args (mapv parse-type-expr (:args x))}
-    :lambda    {:type :lambda
-                :a (parse-type-expr (:a x))
-                :b (parse-type-expr (:b x))}))
+    :var       (Var x)
+    :vargs     (Vargs (trim-vargs x))
+    :type-name (Name x)
+    :type-app  (App (parse-type-expr (:op x)) (mapv parse-type-expr (:args x)))
+    :lambda    (Fn (parse-type-expr (:a x)) (parse-type-expr (:b x)))))
 
 (defn parse [texpr]
   (let [c (s/conform ::signature texpr)]
@@ -97,3 +94,29 @@
              (default
               (=    [x y] (not (!= x y)))
               (not= [x y] (not (= x y))))))
+
+
+(defn arglist [fn-sig]
+  (if (instance? lift.type.Fn fn-sig)
+    (into (if (instance? lift.type.Vargs (.-a fn-sig))
+            ['& (gensym)]
+            [(gensym)])
+           (arglist (.-b fn-sig)))
+    []))
+
+(parse-fn-list-default '(show (a -> String)))
+
+{=
+ {:f =,
+  :sig
+  (lift.type/Fn
+   (lift.type/Var a)
+   (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
+  :impl (fn [x y] (not (!= x y)))},
+ not=
+ {:f not=,
+  :sig
+  (lift.type/Fn
+   (lift.type/Var a)
+   (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
+  :impl (fn [x y] (not (= x y)))}}

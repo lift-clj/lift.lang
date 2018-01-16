@@ -1,32 +1,19 @@
-(ns parse
+(ns lift.lang.analyze
   (:require
+   [clojure.core :as c]
    [clojure.spec.alpha :as s]
-   [type :refer :all]
-   [util :refer [resolve-sym]]
+   [lift.lang.type :refer :all]
+   [lift.lang.util :refer [resolve-sym]]
    [clojure.set :as set])
   (:import
-   [type
-    Arrow Record
-    Literal Symbol Lambda Apply Let If
-    Select Extend Restrict]))
-
-(alias 'c 'clojure.core)
+   [lift.lang.type
+    Apply Arrow Extend If Lambda Let Literal Restrict Select Symbol]))
 
 (defn prim? [x]
   (and (simple-symbol? x) (contains? @type-env x)))
 
 (defn class-name? [x]
   (and (simple-symbol? x) (not (prim? x)) (class? (resolve x))))
-
-(defn record-op? [x]
-  (when (seq? x)
-    (let [h (resolve-sym (first x))
-          {:keys [t]} (get @type-env h)]
-      (when-let [{:keys [in out]} (and (instance? Arrow t) t)]
-        (when (instance? Record in)
-          (let [ls (labels in)]
-            (if (pos? (count ls))
-              (empty? (set/difference (set (map :val ls)) (ftv out))))))))))
 
 (s/def ::literal
   (s/or :Boolean  boolean?
@@ -85,9 +72,6 @@
   (s/coll-of ::expr :kind vector?))
 
 (s/def ::record (s/map-of ::expr ::expr))
-
-;; (s/def ::seq
-;;   (s/coll-of ::quoted :kind seq?))
 
 (s/def ::record-expr
   (s/or ::Var ::var
