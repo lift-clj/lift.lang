@@ -9,8 +9,8 @@
    [lift.f.functor :as f]
    [clojure.set :as set])
   (:import
-   [lift.lang.type
-    Apply Arrow Const Extend If Lambda Let Literal Restrict Select Symbol]))
+   [lift.lang.type Apply Arrow Const Container Extend If Lambda Let Literal
+    Quantified Restrict Select Symbol Var]))
 
 (extend-protocol f/Functor
   Object
@@ -40,7 +40,7 @@
 
 (s/def ::literal
   (s/or :Boolean  boolean?
-        :Int      integer?
+        :Num      (s/or :i integer? :d double? :f float?)
         :String   string?
         :Class    class-name?
         :Symbol   symbol?
@@ -117,8 +117,12 @@
 (defmulti -parse (fn [t expr] t))
 
 (defmethod -parse :Lit [_ value]
-  (-> (Literal. value)
-      (assoc :type (->> value (s/conform ::literal) first name symbol Const.))))
+  (let [k (->> value (s/conform ::literal) first name symbol)
+        t (c/case k
+            Num (Quantified. (Container. k [(Var. 'a)]) (Var. 'a))
+            (Const. k))]
+    (-> (Literal. value)
+        (assoc :type t))))
 
 (defmethod -parse :Def [_ [_ _ expr]]
   expr)
@@ -165,18 +169,7 @@
       (let [x (-parse (first conformed) expr)]
         (cond-> x (record? x) (assoc :expr expr))))))
 
-(defrecord State [s a])
-
-;; (def x (ana parse ))
-
-;; (defn eval [expr]  ; f : Env -> Expr
-;;   (fn [env]
-;;     (prn env expr)
-;;     expr))
-
-(->> '(if true
-        (:x {:x 1})
-        1)
+(->> '(if true 2 2.9)
      (hylo (fn [expr] (fn [env] (check/infer expr env)))
            parse)
     (#(% check/empty-env))

@@ -12,8 +12,8 @@
   (:import
    [clojure.lang IPersistentVector IPersistentMap]
    [lift.lang.type
-    Apply Arrow Const Container Env Extend If Lambda Let Literal Record Restrict
-    Row RowEmpty Scheme Select Substitution Symbol Unit Var]))
+    Apply Arrow Const Container Env Extend If Lambda Let Literal Quantified
+    Record Restrict Row RowEmpty Scheme Select Substitution Symbol Unit Var]))
 
 (def id (sub {}))
 
@@ -99,6 +99,11 @@
   ([[Record row] [Record row']]
    (unify row row'))
 
+  ([[Quantified c t :as t1] [Quantified c' t' :as t2]]
+   (if (= c c')
+     (unify t t')
+     (unification-failure t1 t2)))
+
   ([t1 t2]
    (unification-failure t1 t2)))
 
@@ -149,9 +154,10 @@
 (defprotocol Syntax
   (infer [expr env]))
 
-(defn infer-coll
-  [env type expr]
-  (let [[env expr] (reduce (fn [[s xs] x] (let [[s x] (x s)] [s (conj xs x)]))
+(defn infer-coll [env type expr]
+  (let [[env expr] (reduce (fn [[s xs] x]
+                             (prn s xs x)
+                             (let [[s x] (x s)] [s (conj xs x)]))
                            [env []]
                            expr)
         s (unify-coll (map :type expr))

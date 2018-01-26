@@ -7,7 +7,6 @@
    [lift.f.functor :as f]
    [lift.lang.util :refer :all]
    [clojure.walk :as walk]
-   [clojure.set :as set]
    [clojure.java.io :as io]
    [clojure.core :as c])
   (:import
@@ -18,15 +17,15 @@
 (defprotocol Ftv (ftv [x]))
 (defprotocol Show (show [_]))
 (defprotocol Substitutable (substitute [x s]))
-(defprotocol Debug (explode [x]))
-(defprotocol Destructurable (-destructure [x]))
-(defprotocol Walkable (walk [x f]))
-(defprotocol Labelled (labels [x]))
 
-(defrecord Unit  [])
-(defrecord Const [x])
-(defrecord Var   [val])
-(defrecord Arrow [in out])
+(defrecord Unit  []
+  Indexed (nth [_ i _] (nth [] i nil)))
+(defrecord Const [x]
+  Indexed (nth [_ i _] (nth [x] i nil)))
+(defrecord Var   [val]
+  Indexed (nth [_ i _] (nth [val] i nil)))
+(defrecord Arrow [in out]
+  Indexed (nth [_ i _] (nth [in out] i nil)))
 
 (defrecord Env []
   Functor
@@ -57,37 +56,29 @@
       (pr-str tag))))
 
 (deftype RowEmpty []
+  Indexed
+  (nth [_ i _] (nth [] i nil))
   clojure.lang.IHashEq
   (equals [_ other] (instance? RowEmpty other))
   (hasheq [_] (hash {}))
   (hashCode [_] (.hashCode {}))
-  Debug
-  (explode [x] x)
-  Destructurable
-  (-destructure [_] [])
   Ftv
   (ftv [_] #{})
-  Labelled
-  (labels [_] ())
   Substitutable
   (substitute [x s] x)
   Show
   (show [_] "{}"))
 
 (deftype Row [k v tail]
+  Indexed
+  (nth [_ i _] (nth [k v tail] i nil))
   clojure.lang.IHashEq
   (equals [_ other]
     (and (instance? Row other) (= k (.-k other)) (= v (.-v other))))
   (hasheq [_] (hash [k v]))
   (hashCode [_] (.hashCode [k v]))
-  Debug
-  (explode [x] x)
-  Destructurable
-  (-destructure [_] [k v tail])
   Ftv
-  (ftv [_] (set/union (ftv v) (ftv tail)))
-  Labelled
-  (labels [_] (cons k (labels tail)))
+  (ftv [_] (union (ftv v) (ftv tail)))
   Substitutable
   (substitute [_ s]
     (Row. (substitute k s) (substitute v s) (substitute tail s)))
@@ -95,22 +86,30 @@
   (show [x] (format "%s : %s, %s" (show k) (show v) (show tail))))
 
 (deftype Record [row]
+  Indexed
+  (nth [_ i _] (nth [row] i nil))
   clojure.lang.IHashEq
   (equals [_ other] (and (instance? Record other) (= row (.-row other))))
   (hasheq [_] (hash row))
   (hashCode [_] (.hashCode row))
-  Debug
-  (explode [x] x)
-  Destructurable
-  (-destructure [_] [row])
   Ftv
   (ftv [_] (ftv row))
-  Labelled
-  (labels [_] (labels row))
   Substitutable
   (substitute [_ s] (Record. (substitute row s)))
   Show
   (show [x] (format "{%s}" (show row))))
+
+(deftype Quantified [constraint a]
+  Indexed
+  (nth [_ i _] (nth [constraint a] i nil))
+  Ftv
+  (ftv [_] (difference (ftv a) (ftv constraint)))
+  Substitutable
+  (substitute [_ s]
+    (Quantified. constraint (substitute a s)))
+  Show
+  (show [_]
+    (format "%s => %s" (pr-str constraint) (pr-str a))))
 
 (defrecord Literal [a]
   Indexed (nth [_ i _] (c/case i 0 a nil))
@@ -171,51 +170,6 @@
   (substitute [x s]
     (f/map #(substitute % s) x)))
 
-(extend-protocol Destructurable
-  Unit      (-destructure [x] ())
-  Const     (-destructure [x] [(:x x)])
-  Var       (-destructure [x] [(:val x)])
-  Arrow     (-destructure [x] [(:in x) (:out x)])
-  Container (-destructure [x] (vec (cons (.-tag x) (.-args x))))
-  Literal   (-destructure [x] [(:a x)])
-  Symbol    (-destructure [x] [(:a x)])
-  Lambda    (-destructure [x] [(:x x) (:e x)])
-  Apply     (-destructure [x] [(:e1 x) (:e2 x)])
-  Let       (-destructure [x] [(:x x) (:e1 x) (:e2 x)])
-  If        (-destructure [x] [(:cond x) (:then x) (:else x)])
-  Select    (-destructure [x] [(:rec x) (:label x)]))
-
-(extend-protocol Labelled
-  Var (labels [_] ()))
-
-(extend-protocol Walkable
-  Literal
-  (walk [x f] (f x))
-  Symbol
-  (walk [x f] (f x))
-  Lambda
-  (walk [x f]
-    (let [g #(walk % f)]
-      (f (-> x (update :x g) (update :e g)))))
-  Apply
-  (walk [x f]
-    (let [g #(walk % f)]
-      (f (-> x (update :e1 g) (update :e2 g)))))
-  Let
-  (walk [x f]
-    (let [g #(walk % f)]
-      (f (-> x (update :x g) (update :e1 g) (update :e2 g)))))
-  If
-  (walk [x f]
-    (let [g #(walk % f)]
-      (f (-> x (update :cond g) (update :then g) (update :else g)))))
-  Select
-  (walk [x f]
-    (let [g #(walk % f)]
-      (f (-> x (update :rec g) (update :label g)))))
-  nil
-  (walk [x f] nil))
-
 (defrecord Substitution []
   Functor
   (-fmap [x f] (map-vals f x))
@@ -224,20 +178,6 @@
                       (map (fn [[k v]] (str (pr-str v) \/ (pr-str k))))
                       (string/join ", ")
                       (str "S[")) \])))
-
-(extend-protocol Debug
-  Unit      (explode [x] {:expr '() :type x})
-  Container (explode [x] (assoc (meta (.-tag x)) :type x))
-  Const     (explode [x] (assoc (meta (:x x)) :type x))
-  Var       (explode [x] (assoc (meta (:val x)) :type x))
-  Arrow     (explode [x] (assoc (meta (:in x)) :type x))
-  Literal   (explode [x] (into {} x))
-  Symbol    (explode [x] (into {} x))
-  Apply     (explode [x] (into {} x))
-  Let       (explode [x] (into {} x))
-  If        (explode [x] (into {} x))
-  Scheme    (explode [x] x)
-  nil       (explone [x] nil))
 
 (defmethod print-method Unit      [x w] (.write w (show x)))
 (defmethod print-method Const     [x w] (.write w (show x)))
@@ -574,9 +514,7 @@
                                   Show
                                   (show [_#]
                                     (format "(%s %s)" ~(str tag)
-                                            (string/join " " (map pr-str ~args))))
-                                  Destructurable
-                                  (-destructure [_#] ~args))))
+                                            (string/join " " (map pr-str ~args)))))))
                           ~@(if container?
                               `((defn ~(with-meta tag {:ctor __type-name})
                                   ~args (new ~__type-name ~@args)))

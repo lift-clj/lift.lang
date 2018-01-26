@@ -88,9 +88,8 @@
       `(c/let [type?# (and ~type (instance? (ensure-class ~type) ~value))]
          (when (or type?# (nil? ~type))
            (c/let [value# ~value
-                   ~dsym (if type?# (t/-destructure value#) value#)
                    ~@(when bind [(:binding bind) value])
-                   [~@(map arg-bindings args)] ~dsym]
+                   [~@(map arg-bindings args)] value#]
              ~(cond (some (comp #{:literal} first second) args)
                     `(when (literal= ~dsym '~args)
                        ~(if (seq dest)
