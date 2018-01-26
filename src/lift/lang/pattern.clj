@@ -1,4 +1,4 @@
-(ns pattern
+(ns lift.lang.pattern
   (:refer-clojure :exclude [case defn let])
   (:require
    [clojure.core :as c]

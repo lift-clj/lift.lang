@@ -1,8 +1,9 @@
 (ns lift.lang
-  (:refer-clojure :exclude [compile load read read-string])
+  (:refer-clojure :exclude [compile defmacro load load-file macroexpand
+                            macroexpand-1 read read-string])
   (:require
    [clojure.tools.reader :as r]
-   [clojure.tools.reader.reader-types :refer [read-char unread]]
+   [clojure.tools.reader.reader-types :as rt :refer [read-char unread]]
    [clojure.tools.reader.impl.utils :refer [whitespace?]]
    [clojure.tools.nrepl.middleware :as mw]
    [clojure.core :as c]
@@ -10,38 +11,135 @@
    [clojure.core.specs.alpha :as cs]
    [clojure.string :as string]
    [clojure.java.io :as io]
-   [lift.lang.analyze :as analyze]))
+   [lift.lang.analyze :as analyze]
+   [riddley.walk :as walk]))
 
-;; (defn- root-resource
-;;   "Returns the root directory path for a lib"
-;;   {:tag String}
-;;   [lib]
-;;   (str \/
-;;        (.. (name lib)
-;;            (replace \- \_)
-;;            (replace \. \/))))
+(defn read-colon [reader initch opts pending-forms]
+  (let [ch (read-char reader)]
+    (if (or (nil? ch)
+            (whitespace? ch)
+            (#'r/macro-terminating? ch))
+      (symbol ":")
+      (do
+        (unread reader ch)
+        (#'r/read-keyword reader initch opts pending-forms)))))
 
-;; (defn- root-directory
-;;   "Returns the root resource path for a lib"
-;;   [lib]
-;;   (let [d (root-resource lib)]
-;;     (subs d 0 (.lastIndexOf d "/"))))
+(def macros @#'clojure.tools.reader/macros)
 
+(defn reader-macros [ch]
+  (if (= ch \:) read-colon (macros ch)))
+
+(c/defmacro with-patched-reader [& body]
+  `(with-redefs [clojure.tools.reader/macros reader-macros]
+     ~@body))
+
+(defn read
+  ([]
+   (read *in*))
+  ([reader]
+   (read reader true nil))
+  ([reader eof-error? eof-value]
+   (with-patched-reader (r/read reader (boolean eof-error?) eof-value)))
+  ([opts reader]
+   (with-patched-reader (r/read opts reader))))
+
+(defn read-string [s]
+  (with-patched-reader (r/read-string s)))
+
+(defn parse [expr]
+  (analyze/parse expr)) ;; -> AST
+
+(defn check [ast] ast) ;; -> AST
+
+(defn rewrite [ast]
+  ast) ;; -> AST
+
+(defn reform [ast] ast) ;; -> SExpr
 ;; (def ext "clj")
 ;; (def sep java.io.File/separator)
 
-;; (defn path [lib-sym]
-;;   (-> (name lib-sym)
-;;       (string/split #"\.")
-;;       (->> (string/join sep))
-;;       (str  "." ext)))
+(defn resolve-sym [sym]
+  (let [sym-ns (some-> sym namespace symbol)
+        ns     (if sym-ns
+                 (or (some-> *ns* ns-aliases (get sym-ns)) sym-ns)
+                 *ns*)]
+    (symbol (name (.getName ns)) (name sym))))
 
-;; (defn resource [lib]
-;;   (io/resource (path lib)))
+(def macro-env (atom {}))
 
-;; (resource 'lift.prelude)
+(c/defmacro defmacro [name arglist expr]
+  `(swap! macro-env assoc
+          '~(resolve-sym name)
+          (fn ~name [~'&form ~'&env ~'&type-env ~@arglist] ~expr)))
 
-;; (defn -require [libspec])
+(declare load-ns)
+
+(defmacro ns [name meta require-expr]
+  `(do
+     (in-ns ~name)
+     ~(when meta `((.resetMeta (clojure.lang.Namespace/find '~name) ~meta)))
+     ~@(if (= :require (first require-expr))
+         (map load-ns (rest require-expr))
+         (throw (Exception. "`require-expr` must be `:require`")))))
+
+(defn macro? [expr]
+  (and (symbol? expr) (contains? macro-env expr)))
+
+(defn resolve-macro [sym]
+  (get @macro-env (resolve-sym sym)))
+
+(defn macroexpand-1 [expr]
+  (or (when (seq? expr)
+        (let [[op & args] expr]
+          (when-let [macro-fn (resolve-macro op)]
+            (apply macro-fn expr nil nil args))))
+      expr))
+
+(defn macroexpand [expr]
+  (let [expr' (macroexpand-1 expr)]
+    (if (= expr expr')
+      expr
+      (recur expr'))))
+
+(macroexpand-1 '(ns user
+                  {:lang :lift/clojure}
+                  (:require )
+                  ))
+
+(resolve-macro 'ns)
+
+(defn macroexpand-all [x]
+  (walk/walk-exprs (constantly false) nil #{'ns} x))
+
+(def EOF (Object.))
+(defn- -load [resource]
+  (with-open [r (-> resource io/reader rt/indexing-push-back-reader)]
+    (loop []
+      (let [expr (read r false EOF)]
+        (when-not (= expr EOF)
+          (prn expr)
+          (let [expr'  (macroexpand-all expr)
+                _      (prn expr')
+                ast    (parse expr')
+                _      (prn ast)
+                typed  (check ast)
+                _      (prn typed)
+                ast'   (rewrite typed)
+                expr'' (reform ast')
+                value  (c/eval expr'')]
+            (recur)))))))
+
+
+(defn ns-file-path
+  [ns-sym]
+  (-> ns-sym name (.replace \. \/) (.replace \- \_) (str ".cljd")))
+
+(defn load-ns [ns-sym]
+  (-load (-> ns-sym ns-file-path io/resource)))
+
+(load-ns 'user)
+
+;; (io/resource "lift/lang.clj")
 
 ;; (defn require [& args]
 ;;   (doseq [[t x] (s/conform (s/+ ::cs/libspec) args)]
@@ -107,50 +205,10 @@
     (throw (IllegalArgumentException. (format "Unknown #lang %s" x)))))
 
 
-(defn read-colon [reader initch opts pending-forms]
-  (let [ch (read-char reader)]
-    (if (or (nil? ch)
-            (whitespace? ch)
-            (#'r/macro-terminating? ch))
-      (symbol ":")
-      (do
-        (unread reader ch)
-        (#'r/read-keyword reader initch opts pending-forms)))))
-
-(def macros @#'clojure.tools.reader/macros)
-
-(defn reader-macros [ch]
-  (if (= ch \:) read-colon (macros ch)))
-
-(defmacro with-patched-reader [& body]
-  `(with-redefs [clojure.tools.reader/macros reader-macros]
-     ~@body))
-
-(defn read
-  ([]
-   (read *in*))
-  ([reader]
-   (read reader true nil))
-  ([reader eof-error? eof-value]
-   (with-patched-reader (r/read reader (boolean eof-error?) eof-value)))
-  ([opts reader]
-   (with-patched-reader (r/read opts reader))))
-
-(defn read-string [s]
-  (with-patched-reader (r/read-string s)))
-
-(defn find-ns [sym]
-  (clojure.lang.Namespace/find sym))
+;; (defn find-ns [sym]
+;;   (clojure.lang.Namespace/find sym))
 ;; clojure.tools.nrepl.middleware.interruptible-eval
 
-(defn parse [expr]
-  (analyze/parse expr)) ;; -> AST
-
-(defn check [ast]) ;; -> AST
-
-(defn rewrite [ast]) ;; -> AST
-
-(defn reform [ast]) ;; -> SExpr
 
 (defn load-file [path])
 

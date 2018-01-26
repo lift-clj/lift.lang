@@ -1,4 +1,4 @@
-(ns check
+(ns lift.lang.check
   (:refer-clojure :exclude [case])
   (:require
    [clojure.set :refer [difference union]]
@@ -6,11 +6,16 @@
    [lift.lang.type :refer :all]
    [lift.lang.util :refer :all]
    [clojure.walk :as walk]
-   [clojure.string :as string])
+   [clojure.string :as string]
+   [clojure.core :as c]
+   [lift.f.functor :as f])
   (:import
+   [clojure.lang IPersistentVector IPersistentMap]
    [lift.lang.type
     Apply Arrow Const Container Env Extend If Lambda Let Literal Record Restrict
     Row RowEmpty Scheme Select Substitution Symbol Unit Var]))
+
+(def id (sub {}))
 
 (defn occurs? [x expr]
   (contains? (ftv expr) x))
@@ -51,6 +56,7 @@
 
 (p/defn rewrite-row
   ([l t [RowEmpty _]]
+   (prn l t)
    (throw (Exception. (format "Row does not contain label %s" (show l)))))
 
   ([l t [Row l' t' tail] | (= l l')]
@@ -96,6 +102,11 @@
   ([t1 t2]
    (unification-failure t1 t2)))
 
+(defn unify-coll [coll]
+  (reduce (fn [s [a b]] (unify (substitute a s) (substitute b s)))
+          id
+          (partition 2 1 coll)))
+
 (defmacro unifies? [ast ts]
   `(try
      (unify (:type ~ast) (type-signature '~ts))
@@ -107,34 +118,16 @@
 
 (def fresh-vars
   (let [a (int \a)
-        z (int \z)
-        α (int \α)]
-    (zipmap (map (comp symbol str char) (cons α (range a (inc z))))
+        z (int \z)]
+    (zipmap (map (comp symbol str char) (range a (inc z)))
             (repeat (rest (range))))))
 
-(let [vars (atom fresh-vars)]
+(def empty-env (env {:fresh fresh-vars :type {}}))
 
-  (defn refresh! []
-    (reset! vars fresh-vars)
-    nil)
-
-  (defn fresh [& [a]]
-    (if-let [[n] (get @vars a) ]
-      (do
-        (swap! vars update a rest)
-        (Var. (symbol (str a n))))
-      (do
-        (swap! vars update 'α rest)
-        (Var. (symbol (str \α (first (get @vars 'α)))))))))
-
-(def fresh-vars
-  (atom (for [a (map char (range 97 123)) i (rest (range))]
-          (symbol (str a i)))))
-
-(defn fresh [& _]
-  (when-let [v (first @fresh-vars)]
-    (swap! fresh-vars rest)
-    (Var. v)))
+(defn fresh [env & [a]]
+  (let [a (or a 'a)
+        v (-> env :fresh (get a) first (->> (str a)) symbol Var.)]
+    [(update-in env [:fresh a] rest) v]))
 
 (defn instantiate [{:keys [t vars]}]
   (let [nvars (map (fn [a] (fresh a)) vars)
@@ -144,69 +137,90 @@
 (defn generalize [env t]
   (Scheme. t (difference (ftv t) (ftv env))))
 
-(p/defn infer
-  ([env [Literal a :as expr]]
-   [(sub {}) (if (:type expr) expr (assoc expr :type (Const. a)))])
+(defn lookup [{env :type} {a :a}]
+  (or (when (= a '_) (Scheme. (fresh) #{})) ;; TODO: fresh no more
+      (get env a)
+      (get env (resolve-sym a))
+      (unbound-variable-error a)))
 
-  ([env [Symbol a :as expr]]
-   (if-let [s (or (when (= a '_?) (Scheme. (fresh) #{}))
-                  (get env a)
-                  (get env (resolve-sym a)))]
-     [(sub {}) (merge (assoc expr :type (instantiate s)) (meta s))]
-     (unbound-variable-error expr)))
+(defn ret [env sub expr & [type]]
+  [(assoc env :sub sub) (cond-> expr type (assoc :type type))])
 
-  ([env [Lambda x e :as expr]]
-   (let [tv      (fresh)
-         env'    (assoc env (:a x) (Scheme. tv []))
-         [s1 e'] (infer env' e)
-         t1      (:type e')]
-     [s1 (assoc expr
-                :type (Arrow. (substitute tv s1) t1)
-                :x (assoc x :type tv)
-                :e e')]))
+(defprotocol Syntax
+  (infer [expr env]))
 
-  ([env [Apply e1 e2 :as expr]]
-   (let [tv       (fresh)
-         [s1 e1'] (infer env e1)
-         t1       (:type e1')
-         [s2 e2'] (infer (substitute env s1) e2)
-         t2       (:type e2')
-         s3       (unify (substitute t1 s2) (Arrow. t2 tv))]
-     [(compose s3 s2 s1)
-      (assoc expr :type (substitute tv s3) :e1 e1' :e2 e2')]))
+(defn infer-coll
+  [env type expr]
+  (let [[env expr] (reduce (fn [[s xs] x] (let [[s x] (x s)] [s (conj xs x)]))
+                           [env []]
+                           expr)
+        s (unify-coll (map :type expr))
+        t (-> expr first :type (substitute s))]
+    (ret env s {:expr expr} (Container. type [t]))))
 
-  ([env [Let x e1 e2 :as expr]]
-   (let [[s1 e1'] (infer env e1)
-         t1       (:type e1')
-         env'     (substitute env s1)
-         t        (generalize env' t1)
-         [s2 e2'] (infer (assoc env' (:a x) t) e2)
-         t2       (:type e2')]
-     [(compose s2 s1) (assoc expr :type t2 :x (assoc x :type t) :e1 e1' :e2 e2')]))
+(extend-protocol Syntax
+  Literal
+  (infer [expr env] (ret env id expr))
 
-  ([env [If cond then else :as expr]]
-   (let [[s1 cond'] (infer env cond)
-         t1         (:type cond')
-         [s2 then'] (infer env then)
-         t2         (:type then')
-         [s3 else'] (infer env else)
-         t3         (:type else')
-         s4         (unify t1 (Const. 'Boolean))
-         s5         (unify t2 t3)]
-     [(compose s5 s4 s3 s2 s1)
-      (assoc expr
-             :type (substitute t2 s5)
-             :cond cond'
-             :then then'
-             :else else')]))
+  Symbol
+  (infer [expr env]
+    (ret env id expr (instantiate (lookup env expr))))
 
-  ([env [Select rec label :as expr]]
-   (let [[s1 {t1 :type}]          (infer env label)
-         valtype                  (fresh)
-         basetype                 (fresh)
-         seltype                  (Record. (Row. t1 valtype basetype))
-         [s2 {t2 :type :as rec'}] (infer env rec)
-         s3                       (unify seltype t2)]
-     [(compose s3 s2) (assoc expr
-                             :type (substitute valtype s3)
-                             :rec (assoc rec :type t2))])))
+  Lambda
+  (infer [[x e] env]
+    (let [[env tv] (fresh env (:a x))
+          env (assoc-in env [:type (:a x)] (Scheme. tv []))
+          [{s :sub :as env} e] (e env)
+          t (Arrow. (substitute tv s) (:type e))]
+      (ret env s (Lambda. (assoc x :type tv) e) t)))
+
+  Apply
+  (infer [[e1 e2] env]
+    (let [[env tv] (fresh env)
+          [{s1 :sub :as env} {t1 :type :as e1}] (e1 env)
+          [{s2 :sub :as env} {t2 :type :as e2}] (e2 (substitute env s1))
+          s3 (unify (substitute t1 s2) (Arrow. t2 tv))]
+      (ret env (compose s3 s2 s1) (Apply. e1 e2) (substitute tv s3))))
+
+  Let
+  (infer [[x e1 e2] env]
+    (let [[{s1 :sub :as env} {t1 :type :as e1}] (e1 env)
+          env (substitute env s1)
+          {t :type :as x} (assoc x :type (generalize env t1))
+          env (assoc-in env [:type (:a x)] t)
+          [{s2 :sub :as env} {t2 :type :as e2}] (e2 env)]
+      (ret env (compose s2 s1) (Let. x e1 e2) t2)))
+
+  If
+  (infer [[cond then else] env]
+    (let [[{s1 :sub :as env} {t1 :type :as cond}] (cond env)
+          [{s2 :sub :as env} {t2 :type :as then}] (then env)
+          [{s3 :sub :as env} {t3 :type :as else}] (else env)
+          s4 (unify t1 (Const. 'Boolean))
+          s5 (unify t2 t3)
+          sub (compose s5 s4 s3 s2 s1)]
+      (ret env sub (If. cond then else) (substitute t2 s5))))
+
+  Select
+  (infer [[rec label] env]
+    (let [[env {t1 :type}] (label env)
+          [env vtype] (fresh env)
+          [env btype] (fresh env)
+          rectype (Record. (Row. t1 vtype btype))
+          [{s2 :sub :as env} {t2 :type :as rec}] (rec env)
+          s3 (unify rectype t2)]
+      (ret env (compose s3 s2) (Select. rec label) (substitute vtype s3))))
+
+  IPersistentVector
+  (infer [expr env]
+    (infer-coll env 'Vector expr))
+
+  IPersistentMap
+  (infer [expr env]
+    (let [[env {vals :expr}] (infer-coll env nil (vals expr))
+          keys (keys expr)
+          labels (map #(Const. %) keys)
+          t (Record. (reduce (fn [row [k v]] (Row. k v row))
+                                (RowEmpty.)
+                                (map vector labels (map :type vals))))]
+      (ret env (:sub env) {:expr (into {} (map vector keys vals))} t))))

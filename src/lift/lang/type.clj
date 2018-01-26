@@ -4,10 +4,14 @@
    [clojure.set :refer [difference union]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
+   [lift.f.functor :as f]
    [lift.lang.util :refer :all]
    [clojure.walk :as walk]
    [clojure.set :as set]
-   [clojure.java.io :as io]))
+   [clojure.java.io :as io]
+   [clojure.core :as c])
+  (:import
+   [clojure.lang Indexed IPersistentVector]))
 
 (alias 'c 'clojure.core)
 
@@ -108,15 +112,35 @@
   Show
   (show [x] (format "{%s}" (show row))))
 
-(defrecord Literal [a])
-(defrecord Symbol  [a])
-(defrecord Lambda  [x e])
-(defrecord Apply   [e1 e2])
-(defrecord Let     [x e1 e2])
-(defrecord If      [cond then else])
+(defrecord Literal [a]
+  Indexed (nth [_ i _] (c/case i 0 a nil))
+  f/Functor (f/-map [x f] x))
+
+(defrecord Symbol [a]
+  Indexed (nth [_ i _] (c/case i 0 a nil))
+  f/Functor (f/-map [x f] x))
+
+(defrecord Lambda [x e]
+  Indexed (nth [_ i _] (c/case i 0 x 1 e nil))
+  f/Functor (f/-map [_ f] (Lambda. x (f e))))
+
+(defrecord Apply [e1 e2]
+  Indexed (nth [_ i _] (c/case i 0 e1 1 e2 nil))
+  f/Functor (f/-map [_ f] (Apply. (f e1) (f e2))))
+
+(defrecord Let [x e1 e2]
+  Indexed (nth [_ i _] (c/case i 0 x 1 e1 2 e2 nil))
+  f/Functor (f/-map [_ f] (Let. x (f e1) (f e2))))
+
+(defrecord If [cond then else]
+  Indexed (nth [_ i _] (c/case i 0 cond 1 then 2 else nil))
+  f/Functor (f/-map [_ f] (If. (f cond) (f then) (f else))))
 
 ;; Records
-(defrecord Select   [rec label])
+(defrecord Select [rec label]
+  Indexed (nth [_ i _] (c/case i 0 rec 1 label nil))
+  f/Functor (f/-map [_ f] (Select. (f rec) (f label))))
+
 (defrecord Extend   [rec label value])
 (defrecord Restrict [rec label])
 
@@ -134,14 +158,18 @@
            (Arrow. (substitute (:in x) s) (substitute (:out x) s))))
 
 (extend-protocol Ftv
-  Env       (ftv [x] (->> x vals (mapcat ftv) set))
-  Scheme    (ftv [x] (difference (ftv (:t x)) (set (:vars x))))
-  nil       (ftv [x] #{}))
+  Env               (ftv [x] (->> x :type vals (mapcat ftv) set))
+  Scheme            (ftv [x] (difference (ftv (:t x)) (set (:vars x))))
+  IPersistentVector (ftv [x] (set (mapcat ftv x)))
+  nil               (ftv [x] #{}))
 
 (extend-protocol Substitutable
-  Env       (substitute [x s] (fmap #(substitute % s) x))
-  Scheme    (substitute [{:keys [vars t] :as x} s]
-              (update x :t substitute (apply dissoc s vars))))
+  Env    (substitute [x s] (update x :type f/-map #(substitute % s)))
+  Scheme (substitute [{:keys [vars t] :as x} s]
+           (update x :t substitute (apply dissoc s vars)))
+  IPersistentVector
+  (substitute [x s]
+    (f/map #(substitute % s) x)))
 
 (extend-protocol Destructurable
   Unit      (-destructure [x] ())
@@ -217,7 +245,7 @@
 (defmethod print-method Arrow     [x w] (.write w (show x)))
 (defmethod print-method Container [x w] (.write w (show x)))
 
-(defmethod print-method Env    [x w] (.write w (show x)))
+(defmethod print-method Env    [x w] (.write w (pr-str (:type x))))
 (defmethod print-method Scheme [x w] (.write w (show x)))
 
 (defmethod print-method Substitution [x w] (.write w (show x)))
@@ -238,8 +266,8 @@
   Scheme    (show [x] (format "(Scheme %s %s)" (pr-str (:t x)) (pr-str (:vars x)))))
 
 (extend-protocol Show
-  Literal (show [x] (pr-str (:expr x)))
-  Symbol  (show [x] (pr-str (:expr x)))
+  Literal (show [x] (pr-str (:a x)))
+  Symbol  (show [x] (pr-str (:a x)))
   Lambda  (show [x] (format "(fn [%s] %s)" (pr-str (:x x)) (pr-str (:e x))))
   Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x)) (pr-str (:e2 x))))
   Let     (show [x] (format "(let [%s %s] %s)"
@@ -385,7 +413,7 @@
         (dissoc :=))))
 
 (defmethod construct :rec-cons [[_ [_ {:keys [type-name recmap]}]]]
-  (Container. (resolve-sym type-name) [(fmap construct (VarSet. recmap))]))
+  (Container. (resolve-sym type-name) [(f/map construct (VarSet. recmap))]))
 
 (defmethod construct :record [[_ ast]]
   (-> ast
@@ -462,7 +490,7 @@
                    (let [ns    (range 0 n)
                          vars  (mapv (comp symbol str char (partial + fst)) ns)
                          tuple (apply list (symbol (str "Tuple" n)) vars)]
-                     `((lift.lang.type/def  ~tuple)
+                     `((lift.lang.type/def ~tuple)
                        ~@(apply concat
                                 (for [[n2 a] (map vector ns vars)]
                                   (let [proj (symbol (str "proj-" n \- n2))]
