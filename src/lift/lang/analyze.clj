@@ -10,7 +10,7 @@
    [clojure.set :as set])
   (:import
    [lift.lang.type Apply Arrow Const Constraint Container Extend If Lambda Let
-    Literal Quantified Restrict Select Symbol Var]))
+    Literal Map Quantified Restrict Select Symbol Var Vector]))
 
 (extend-protocol f/Functor
   Object
@@ -81,7 +81,8 @@
 
 (s/def ::vector vector?)
 
-(s/def ::record (s/map-of keyword? any?))
+(s/def ::record
+  (s/and (complement record?) (s/map-of keyword? any?)))
 
 (s/def ::record-expr
   (s/or :Var ::var
@@ -131,7 +132,10 @@
   (Symbol. expr))
 
 (defmethod -parse :Lam [_ [_ arglist expr]]
-  (reduce (fn [e x] (Lambda. (Symbol. x) e))
+  (prn arglist (reverse arglist) expr)
+  (reduce (fn [e x]
+            (prn e x)
+            (Lambda. (Symbol. x) e))
           expr
           (reverse arglist)))
 
@@ -147,9 +151,9 @@
 (defmethod -parse :If  [_ [_ cond then else]]
   (If. cond then else))
 
-(defmethod -parse :Vec [_ expr] expr)
+(defmethod -parse :Vec [_ expr] (Vector. expr))
 
-(defmethod -parse :Rec [_ expr] expr)
+(defmethod -parse :Rec [_ expr] (Map. expr))
 
 (defmethod -parse :Sel [_ [op arg]]
   (Select. arg (-> (Literal. op) (assoc :type (Const. op)))))
@@ -162,10 +166,12 @@
 
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
+    (prn expr conformed)
     (if (s/invalid? conformed)
-      (do
-        (s/explain ::expr expr)
-        (throw (Exception. "Invalid Syntax")))
+      (if (record? expr)
+        expr
+        (throw (Exception. (str "Invalid Syntax"
+                                (with-out-str (s/explain ::expr expr))))))
       (let [x (-parse (first conformed) expr)]
         (cond-> x (record? x) (assoc :expr expr))))))
 
@@ -174,5 +180,5 @@
            parse)
     (#(% check/empty-env))
     second
-    :type
+    ;; :type
  )

@@ -52,8 +52,8 @@
   Show
   (show [x]
     (if args
-      (format "(%s %s)" (pr-str tag) (string/join " " (map pr-str args)))
-      (pr-str tag))))
+      (format "(%s %s)" (str tag) (string/join " " (map pr-str args)))
+      (str tag))))
 
 (deftype RowEmpty []
   Indexed
@@ -83,7 +83,7 @@
   (substitute [_ s]
     (Row. (substitute k s) (substitute v s) (substitute tail s)))
   Show
-  (show [x] (format "%s : %s, %s" (show k) (show v) (show tail))))
+  (show [x] (format "%s : %s, %s" (pr-str k) (pr-str v) (pr-str tail))))
 
 (deftype Record [row]
   Indexed
@@ -97,7 +97,7 @@
   Substitutable
   (substitute [_ s] (Record. (substitute row s)))
   Show
-  (show [x] (format "{%s}" (show row))))
+  (show [x] (format "{%s}" (pr-str row))))
 
 (deftype Constraint [tag a]
   clojure.lang.IHashEq
@@ -159,6 +159,16 @@
 (defrecord Extend   [rec label value])
 (defrecord Restrict [rec label])
 
+(defrecord Vector [xs]
+  f/Functor (f/-map [_ f] (Vector. (f/-map xs f)))
+  Show (show [_] (format "[%s]" (string/join " " (f/map pr-str xs)))))
+
+(defrecord Map [r]
+  f/Functor (f/-map [_ f] (Map. (f/-map r f)))
+  Show (show [_] (->> (map (fn [[k v]] (str k " " (pr-str v))) r)
+                      (string/join ", ")
+                      (format "{%s}"))))
+
 (extend-protocol Ftv
   Unit   (ftv [x] #{})
   Const  (ftv [x] #{})
@@ -218,17 +228,20 @@
 (defmethod print-method Let     [x w] (.write w (show x)))
 (defmethod print-method If      [x w] (.write w (show x)))
 
+(defmethod print-method Vector  [x w] (.write w (show x)))
+(defmethod print-method Map     [x w] (.write w (show x)))
+
 (extend-protocol Show
   Unit      (show [_] "()")
-  Const     (show [x] (pr-str (:x x)))
-  Var       (show [x] (pr-str (:val x)))
+  Const     (show [x] (str (:x x)))
+  Var       (show [x] (str (:val x)))
   Arrow     (show [x] (format "(%s -> %s)" (pr-str (:in x)) (pr-str (:out x))))
   Env       (show [x] (format "Γ %s" (string/join (map pr-str x))))
   Scheme    (show [x] (format "(Scheme %s %s)" (pr-str (:t x)) (pr-str (:vars x)))))
 
 (extend-protocol Show
-  Literal (show [x] (pr-str (name (:a x))))
-  Symbol  (show [x] (pr-str (:a x)))
+  Literal (show [x] (name (:a x)))
+  Symbol  (show [x] (str (:a x)))
   Lambda  (show [x] (format "(fn [%s] %s)" (pr-str (:x x)) (pr-str (:e x))))
   Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x)) (pr-str (:e2 x))))
   Let     (show [x] (format "(let [%s %s] %s)"

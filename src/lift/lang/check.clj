@@ -12,8 +12,9 @@
   (:import
    [clojure.lang IPersistentVector IPersistentMap]
    [lift.lang.type
-    Apply Arrow Const Container Env Extend If Lambda Let Literal Quantified
-    Record Restrict Row RowEmpty Scheme Select Substitution Symbol Unit Var]))
+    Apply Arrow Const Container Env Extend If Lambda Let Literal Map Quantified
+    Record Restrict Row RowEmpty Scheme Select Substitution Symbol Unit Var
+    Vector]))
 
 (def id (sub {}))
 
@@ -221,11 +222,12 @@
           s3 (unify rectype t2)]
       (ret env (compose s3 s2) (Select. rec label) (substitute vtype s3))))
 
-  IPersistentVector
+  Vector
   (infer [expr env]
-    (infer-coll env 'Vector expr))
+    (let [[env {:keys [expr type]}] (infer-coll env 'Vector (:xs expr))]
+      (ret env (:sub env) (Vector. expr) type)))
 
-  IPersistentMap
+  Map
   (infer [expr env]
     (let [[env {vals :expr}] (infer-coll env nil (vals expr))
           keys (keys expr)
@@ -233,4 +235,4 @@
           t (Record. (reduce (fn [row [k v]] (Row. k v row))
                                 (RowEmpty.)
                                 (map vector labels (map :type vals))))]
-      (ret env (:sub env) {:expr (into {} (map vector keys vals))} t))))
+      (ret env (:sub env) (Map. (into {} (map vector keys vals))) t))))
