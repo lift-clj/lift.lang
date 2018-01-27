@@ -43,7 +43,7 @@
 (defn bind [a t]
   (cond (= t (Var. a)) id
         (occurs? a t)  (throw (ex-info "Infinite Type" {:a a :t t}))
-        :else          id))
+        :else          (sub {a t})))
 
 (defn unify-compound [t1 tag1 t1-args t2 tag2 t2-args]
   (if (= tag1 tag2)
@@ -114,9 +114,7 @@
    (unification-failure t1 t2)))
 
 (defn unify-coll [coll]
-  (reduce (fn [s [a b]] (unify (substitute a s) (substitute b s)))
-          id
-          (partition 2 1 coll)))
+  (reduce (fn [s [a b]] (compose (unify a b) s)) id (partition 2 1 coll)))
 
 (defmacro unifies? [ast ts]
   `(try
@@ -162,8 +160,8 @@
 
 (defn infer-coll [env type expr]
   (let [[env expr] (reduce (fn [[s xs] x]
-                             (prn s xs x)
-                             (let [[s x] (x s)] [s (conj xs x)]))
+                             (let [[s x] (x s)]
+                               [s (conj xs x)]))
                            [env []]
                            expr)
         s (unify-coll (map :type expr))

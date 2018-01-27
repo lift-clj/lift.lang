@@ -169,7 +169,7 @@
       (let [x (-parse (first conformed) expr)]
         (cond-> x (record? x) (assoc :expr expr))))))
 
-(->> (if true 2 3.3)
+(->> '(fn [a b c] [a b c])
      (hylo (fn [expr] (fn [env] (check/infer expr env)))
            parse)
     (#(% check/empty-env))

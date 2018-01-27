@@ -201,7 +201,12 @@
 (defmethod print-method Arrow     [x w] (.write w (show x)))
 (defmethod print-method Container [x w] (.write w (show x)))
 
-(defmethod print-method Env    [x w] (.write w (pr-str (:type x))))
+(defmethod print-method Env    [x w]
+  (.write w
+          (format "[Sub %s\nType %s]"
+                  (pr-str (:sub x))
+                  (pr-str (:type x)))))
+
 (defmethod print-method Scheme [x w] (.write w (show x)))
 
 (defmethod print-method Substitution [x w] (.write w (show x)))
