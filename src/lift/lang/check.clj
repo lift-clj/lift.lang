@@ -41,16 +41,16 @@
    (reduce compose (conj ss s2 s1))))
 
 (defn bind [a t]
-  (cond (= t (Var. a)) (sub {})
+  (cond (= t (Var. a)) id
         (occurs? a t)  (throw (ex-info "Infinite Type" {:a a :t t}))
-        :else          (sub {a t})))
+        :else          id))
 
 (defn unify-compound [t1 tag1 t1-args t2 tag2 t2-args]
   (if (= tag1 tag2)
     (if (= (count t1-args) (count t2-args))
       (->> (map vector t1-args t2-args)
            (reduce (fn [s [t1 t2]] (compose (trampoline unify t1 t2) s))
-                   (sub {})))
+                   id))
       (arity-error t1 t2))
     (unification-failure t1 t2)))
 
@@ -73,6 +73,12 @@
   ([_ _ x]
    (throw (Exception. (format "Expected row type, got %s" (show x))))))
 
+(defn unify-constraint [a b]
+  (cond (= a b)    id
+        (isa? a b) (sub {b a})
+        (isa? b a) (sub {a b})
+        :else      (unification-failure a b)))
+
 (p/defn unify
   ([[Arrow l r :as t1] [Arrow l' r' :as t2]]
    (let [s1 (unify l l')
@@ -83,12 +89,12 @@
 
   ([t [Var a]] (bind a t))
 
-  ([[Const a] [Const b] | (= a b)] (sub {}))
+  ([[Const a] [Const b] | (= a b)] id)
 
   ([[Container tag1 & t1-args :as t1] [Container tag2 & t2-args :as t2]]
    (unify-compound t1 tag1 t1-args t2 tag2 t2-args))
 
-  ([[RowEmpty _] [RowEmpty _]] (sub {}))
+  ([[RowEmpty _] [RowEmpty _]] id)
 
   ([[Row k v tail :as row] [Row _ :as row']]
    ;; side ^^ condition needed here on tail before rewrite
@@ -100,9 +106,9 @@
    (unify row row'))
 
   ([[Quantified c t :as t1] [Quantified c' t' :as t2]]
-   (if (= c c')
-     (unify t t')
-     (unification-failure t1 t2)))
+   (let [s1 (unify-constraint c c')
+         s2 (unify t t')]
+     (compose s1 s2)))
 
   ([t1 t2]
    (unification-failure t1 t2)))
@@ -202,7 +208,7 @@
     (let [[{s1 :sub :as env} {t1 :type :as cond}] (cond env)
           [{s2 :sub :as env} {t2 :type :as then}] (then env)
           [{s3 :sub :as env} {t3 :type :as else}] (else env)
-          s4 (unify t1 (Const. 'Boolean))
+          s4 (unify t1 (Const. 'lift/Boolean))
           s5 (unify t2 t3)
           sub (compose s5 s4 s3 s2 s1)]
       (ret env sub (If. cond then else) (substitute t2 s5))))

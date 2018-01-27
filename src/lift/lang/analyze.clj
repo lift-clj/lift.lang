@@ -9,8 +9,8 @@
    [lift.f.functor :as f]
    [clojure.set :as set])
   (:import
-   [lift.lang.type Apply Arrow Const Container Extend If Lambda Let Literal
-    Quantified Restrict Select Symbol Var]))
+   [lift.lang.type Apply Arrow Const Constraint Container Extend If Lambda Let
+    Literal Quantified Restrict Select Symbol Var]))
 
 (extend-protocol f/Functor
   Object
@@ -117,9 +117,9 @@
 (defmulti -parse (fn [t expr] t))
 
 (defmethod -parse :Lit [_ value]
-  (let [k (->> value (s/conform ::literal) first name symbol)
+  (let [k (->> value (s/conform ::literal) first name (symbol "lift"))
         t (c/case k
-            Num (Quantified. (Container. k [(Var. 'a)]) (Var. 'a))
+            lift/Num (Quantified. [(Constraint. k (Var. 'a))] (Var. 'a))
             (Const. k))]
     (-> (Literal. value)
         (assoc :type t))))
@@ -169,7 +169,7 @@
       (let [x (-parse (first conformed) expr)]
         (cond-> x (record? x) (assoc :expr expr))))))
 
-(->> '(if true 2 2.9)
+(->> (if true 2 3.3)
      (hylo (fn [expr] (fn [env] (check/infer expr env)))
            parse)
     (#(% check/empty-env))

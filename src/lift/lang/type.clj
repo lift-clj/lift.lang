@@ -99,17 +99,33 @@
   Show
   (show [x] (format "{%s}" (show row))))
 
-(deftype Quantified [constraint a]
+(deftype Constraint [tag a]
+  clojure.lang.IHashEq
+  (equals [_ other] (and (instance? Constraint other)
+                         (= tag (.-tag other))
+                         (= a (.-a other))))
+  (hasheq [_] (hash a))
+  (hashCode [_] (.hashCode a))
   Indexed
-  (nth [_ i _] (nth [constraint a] i nil))
+  (nth [_ i _] (nth [a] i nil))
   Ftv
-  (ftv [_] (difference (ftv a) (ftv constraint)))
+  (ftv [_] (ftv a))
+  Substitutable
+  (substitute [_ s] (Constraint. tag (substitute a s)))
+  Show
+  (show [_] (format "%s %s" (name tag) (pr-str a))))
+
+(deftype Quantified [constraints a]
+  Indexed
+  (nth [_ i _] (nth [constraints a] i nil))
+  Ftv
+  (ftv [_] (difference (ftv a) (set (mapcat ftv constraints))))
   Substitutable
   (substitute [_ s]
-    (Quantified. constraint (substitute a s)))
+    (Quantified. constraints (substitute a s)))
   Show
   (show [_]
-    (format "%s => %s" (pr-str constraint) (pr-str a))))
+    (format "%s => %s" (string/join "," (map pr-str constraints)) (pr-str a))))
 
 (defrecord Literal [a]
   Indexed (nth [_ i _] (c/case i 0 a nil))
@@ -206,7 +222,7 @@
   Scheme    (show [x] (format "(Scheme %s %s)" (pr-str (:t x)) (pr-str (:vars x)))))
 
 (extend-protocol Show
-  Literal (show [x] (pr-str (:a x)))
+  Literal (show [x] (pr-str (name (:a x))))
   Symbol  (show [x] (pr-str (:a x)))
   Lambda  (show [x] (format "(fn [%s] %s)" (pr-str (:x x)) (pr-str (:e x))))
   Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x)) (pr-str (:e2 x))))
@@ -464,70 +480,70 @@
        (new ~(symbol (str "__" tagstr))
             ~(into {} (map vector (keys margs) arglist))))))
 
-(defn record-constuct [tag rec-cons]
-  (let [tagstr (name (.-tag rec-cons))
-        tag' (symbol tagstr)
-        args' (:vs (first (.-args rec-cons)))
-        val-types (vec (mapcat -destructure (vals args')))
-        margs (zipmap (map (partial record-keyword tagstr) (keys args'))
-                      val-types)
-        type-expr (list tag (into {} (map (juxt key (comp :val val)) args')))]
-    `((t/def ~type-expr)
-      (t/def ~tag ~(interpose '-> (conj val-types type-expr)))
-      ~(record-type tagstr)
-      ~(record-defn tagstr margs)
-      ~@(map (fn [[k v]] `(t/def ~k ~(concat type-expr ['-> v]))) margs)
-      (list '~(resolve-sym (first type-expr))
-       '~@(rest type-expr)))))
+;; (defn record-constuct [tag rec-cons]
+;;   (let [tagstr (name (.-tag rec-cons))
+;;         tag' (symbol tagstr)
+;;         args' (:vs (first (.-args rec-cons)))
+;;         val-types (vec (mapcat -destructure (vals args')))
+;;         margs (zipmap (map (partial record-keyword tagstr) (keys args'))
+;;                       val-types)
+;;         type-expr (list tag (into {} (map (juxt key (comp :val val)) args')))]
+;;     `((t/def ~type-expr)
+;;       (t/def ~tag ~(interpose '-> (conj val-types type-expr)))
+;;       ~(record-type tagstr)
+;;       ~(record-defn tagstr margs)
+;;       ~@(map (fn [[k v]] `(t/def ~k ~(concat type-expr ['-> v]))) margs)
+;;       (list '~(resolve-sym (first type-expr))
+;;        '~@(rest type-expr)))))
 
-(defmacro data
-  {:style/indent :defn}
-  [& decl]
-  (let [{:keys [type-cons] :as parsed} (construct (s/conform ::data decl))
-        args (mapv :val (.-args type-cons))
-        tag (symbol (name (.-tag type-cons)))
-        type-expr (apply list tag args)]
-    `(do
-       ~@(if-let [rec-cons (:rec-cons parsed)]
-           (record-constuct tag rec-cons)
-           (apply list
-                  `(t/def ~type-expr)
-                  (concat
-                   (mapcat
-                    (fn [part]
-                      (let [container? (instance? Container part)
-                            tag (if container? (symbol (name (.-tag part))) (:x part))
-                            args (if container? (mapv :val (.-args part)) [])
-                            size (count args)
-                            tupl (symbol "type" (str "Tuple" size))
-                            __name (str "__" (name tag))
-                            __type-name (symbol __name)
-                            destructor (symbol (str __name "-destructure"))
-                            projs-syms (mapv #(symbol "type" (str "proj-" size \- %))
-                                             (range 0 size))
-                            projs (symbol (str __name "-projs"))]
-                        `((t/def ~tag ~(if container?
-                                         (interpose '-> (conj args type-expr))
-                                         type-expr))
-                          ~@(when container?
-                              `((deftype ~__type-name ~args
-                                  Show
-                                  (show [_#]
-                                    (format "(%s %s)" ~(str tag)
-                                            (string/join " " (map pr-str ~args)))))))
-                          ~@(if container?
-                              `((defn ~(with-meta tag {:ctor __type-name})
-                                  ~args (new ~__type-name ~@args)))
-                              `((def ~tag (reify Show (show [_#] ~(name tag))))))
-                          ~@(when container?
-                              `((def ~projs '~projs-syms)
-                                (t/def ~destructor
-                                  ~(interpose '-> (into [type-expr] [(cons tupl args)])))
-                                (defn ~destructor [~'x]
-                                  ~(mapv (fn [a] `(~(symbol (str ".-" a)) ~'x)) args)))))))
-                    (or (:sum-cons parsed)
-                        [(:value-cons parsed)]))
-                   [type-cons]))))))
+;; (defmacro data
+;;   {:style/indent :defn}
+;;   [& decl]
+;;   (let [{:keys [type-cons] :as parsed} (construct (s/conform ::data decl))
+;;         args (mapv :val (.-args type-cons))
+;;         tag (symbol (name (.-tag type-cons)))
+;;         type-expr (apply list tag args)]
+;;     `(do
+;;        ~@(if-let [rec-cons (:rec-cons parsed)]
+;;            (record-constuct tag rec-cons)
+;;            (apply list
+;;                   `(t/def ~type-expr)
+;;                   (concat
+;;                    (mapcat
+;;                     (fn [part]
+;;                       (let [container? (instance? Container part)
+;;                             tag (if container? (symbol (name (.-tag part))) (:x part))
+;;                             args (if container? (mapv :val (.-args part)) [])
+;;                             size (count args)
+;;                             tupl (symbol "type" (str "Tuple" size))
+;;                             __name (str "__" (name tag))
+;;                             __type-name (symbol __name)
+;;                             destructor (symbol (str __name "-destructure"))
+;;                             projs-syms (mapv #(symbol "type" (str "proj-" size \- %))
+;;                                              (range 0 size))
+;;                             projs (symbol (str __name "-projs"))]
+;;                         `((t/def ~tag ~(if container?
+;;                                          (interpose '-> (conj args type-expr))
+;;                                          type-expr))
+;;                           ~@(when container?
+;;                               `((deftype ~__type-name ~args
+;;                                   Show
+;;                                   (show [_#]
+;;                                     (format "(%s %s)" ~(str tag)
+;;                                             (string/join " " (map pr-str ~args)))))))
+;;                           ~@(if container?
+;;                               `((defn ~(with-meta tag {:ctor __type-name})
+;;                                   ~args (new ~__type-name ~@args)))
+;;                               `((def ~tag (reify Show (show [_#] ~(name tag))))))
+;;                           ~@(when container?
+;;                               `((def ~projs '~projs-syms)
+;;                                 (t/def ~destructor
+;;                                   ~(interpose '-> (into [type-expr] [(cons tupl args)])))
+;;                                 (defn ~destructor [~'x]
+;;                                   ~(mapv (fn [a] `(~(symbol (str ".-" a)) ~'x)) args)))))))
+;;                     (or (:sum-cons parsed)
+;;                         [(:value-cons parsed)]))
+;;                    [type-cons]))))))
 
 (defmethod print-method Object [x w]
   (if (satisfies? Show x)
