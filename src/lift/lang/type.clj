@@ -44,6 +44,8 @@
   (equals [_ other] (and (instance? Container other) (= tag (.-tag other))))
   (hasheq [_] (hash tag))
   (hashCode [_] (.hashCode tag))
+  Indexed
+  (nth [_ i _] (nth [tag args] i nil))
   Ftv
   (ftv [_] (set (mapcat ftv args)))
   Substitutable
@@ -52,7 +54,7 @@
   Show
   (show [x]
     (if args
-      (format "(%s %s)" (str tag) (string/join " " (map pr-str args)))
+      (format "(%s %s)" (str tag) (string/join ", " (map pr-str args)))
       (str tag))))
 
 (deftype RowEmpty []
@@ -135,6 +137,15 @@
   Indexed (nth [_ i _] (c/case i 0 a nil))
   f/Functor (f/-map [x f] x))
 
+(defrecord Variadic [vfns]
+  Indexed (nth [_ i _] (nth [vfns] i nil))
+  f/Functor (f/-map [_ f] (Variadic. (f/map f vfns)))
+  Show      (show [_]
+              (->> vfns
+                   (map (fn [[xs e]] (format "(%s %s)" (pr-str xs) (pr-str e))))
+                   (string/join "\n ")
+                   (format "(fn\n %s)"))))
+
 (defrecord Lambda [x e]
   Indexed (nth [_ i _] (c/case i 0 x 1 e nil))
   f/Functor (f/-map [_ f] (Lambda. x (f e))))
@@ -160,14 +171,24 @@
 (defrecord Restrict [rec label])
 
 (defrecord Vector [xs]
-  f/Functor (f/-map [_ f] (Vector. (f/-map xs f)))
-  Show (show [_] (format "[%s]" (string/join " " (f/map pr-str xs)))))
+  Indexed       (nth [_ i _] (nth [xs] i nil))
+  f/Functor     (f/-map [_ f] (Vector. (f/-map xs f)))
+  Show          (show [_] (format "[%s]" (string/join " " (f/map pr-str xs))))
+  Substitutable (substitute [_ s] (Vector. (f/map #(substitute % s) xs)))
+  Ftv           (ftv [_] (set (mapcat ftv xs))))
 
 (defrecord Map [r]
   f/Functor (f/-map [_ f] (Map. (f/-map r f)))
   Show (show [_] (->> (map (fn [[k v]] (str k " " (pr-str v))) r)
                       (string/join ", ")
                       (format "{%s}"))))
+
+(defrecord Tuple [xs]
+  Indexed       (nth [_ i _] (nth [xs] i nil))
+  f/Functor     (f/-map [_ f] (Tuple. (f/-map xs f)))
+  Show          (show [_] (format "[%s]" (string/join " " (f/map pr-str xs))))
+  Substitutable (substitute [_ s] (Tuple. (f/map #(substitute % s) xs)))
+  Ftv           (ftv [_] (set (mapcat ftv xs))))
 
 (extend-protocol Ftv
   Unit   (ftv [x] #{})
@@ -221,29 +242,32 @@
 
 (defmethod print-method Substitution [x w] (.write w (show x)))
 
-(defmethod print-method Literal [x w] (.write w (show x)))
-(defmethod print-method Symbol  [x w] (.write w (show x)))
-(defmethod print-method Lambda  [x w] (.write w (show x)))
-(defmethod print-method Apply   [x w] (.write w (show x)))
-(defmethod print-method Let     [x w] (.write w (show x)))
-(defmethod print-method If      [x w] (.write w (show x)))
+(defmethod print-method Literal  [x w] (.write w (show x)))
+(defmethod print-method Symbol   [x w] (.write w (show x)))
+(defmethod print-method Variadic [x w] (.write w (show x)))
+(defmethod print-method Lambda   [x w] (.write w (show x)))
+(defmethod print-method Apply    [x w] (.write w (show x)))
+(defmethod print-method Let      [x w] (.write w (show x)))
+(defmethod print-method If       [x w] (.write w (show x)))
 
 (defmethod print-method Vector  [x w] (.write w (show x)))
 (defmethod print-method Map     [x w] (.write w (show x)))
+(defmethod print-method Tuple   [x w] (.write w (show x)))
 
 (extend-protocol Show
   Unit      (show [_] "()")
   Const     (show [x] (str (:x x)))
-  Var       (show [x] (str (:val x)))
+  Var       (show [x] (pr-str (:val x)))
   Arrow     (show [x] (format "(%s -> %s)" (pr-str (:in x)) (pr-str (:out x))))
   Env       (show [x] (format "Γ %s" (string/join (map pr-str x))))
   Scheme    (show [x] (format "(Scheme %s %s)" (pr-str (:t x)) (pr-str (:vars x)))))
 
 (extend-protocol Show
-  Literal (show [x] (name (:a x)))
+  Literal (show [x] (str (:a x)))
   Symbol  (show [x] (str (:a x)))
-  Lambda  (show [x] (format "(fn [%s] %s)" (pr-str (:x x)) (pr-str (:e x))))
-  Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x)) (pr-str (:e2 x))))
+  Lambda  (show [[x e]] (format "(fn %s %s)" (pr-str x) (pr-str e)))
+  Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x))
+                            (string/join " " (map pr-str (:xs (:e2 x))))))
   Let     (show [x] (format "(let [%s %s] %s)"
                             (pr-str (:x x))
                             (pr-str (:e1 x))

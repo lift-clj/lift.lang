@@ -10,7 +10,7 @@
    [clojure.set :as set])
   (:import
    [lift.lang.type Apply Arrow Const Constraint Container Extend If Lambda Let
-    Literal Map Quantified Restrict Select Symbol Var Vector]))
+    Literal Map Quantified Restrict Select Symbol Tuple Var Variadic Vector]))
 
 (extend-protocol f/Functor
   Object
@@ -53,10 +53,17 @@
 (s/def ::var
   (s/and symbol? (complement prim?) (complement class-name?)))
 
+(s/def ::arglist (s/coll-of ::var :kind vector?))
+
 (s/def ::lambda
   (s/and seq? (s/cat :lamb #{'fn}
-                     :bind (s/coll-of ::var :kind vector?)
+                     :bind ::arglist
                      :expr any?)))
+
+(s/def ::variadic
+  (s/and seq?
+         (s/cat :fn #{'fn}
+                :vs (s/+ (s/and seq? (s/cat :bind ::arglist :expr any?))))))
 
 (s/def ::record-selection
   (s/and seq? (s/cat :op keyword? :arg ::record-expr)))
@@ -99,6 +106,7 @@
   (s/or :Def ::def
         :Var ::var
         :Lit ::literal
+        :VFn ::variadic
         :Lam ::lambda
         :Let ::let
         :If  ::if
@@ -131,16 +139,17 @@
 (defmethod -parse :Var [_ expr]
   (Symbol. expr))
 
+(defmethod -parse :VFn [_ [_ & vfns]]
+  (Variadic.
+   (mapv (fn [[arglist expr]]
+           (Lambda. (Tuple. (map #(Symbol. %) arglist)) expr))
+         vfns)))
+
 (defmethod -parse :Lam [_ [_ arglist expr]]
-  (prn arglist (reverse arglist) expr)
-  (reduce (fn [e x]
-            (prn e x)
-            (Lambda. (Symbol. x) e))
-          expr
-          (reverse arglist)))
+  (Lambda. (Tuple. (map #(Symbol. %) arglist)) expr))
 
 (defmethod -parse :App [_ [op & args]]
-  (reduce (fn [e1 e2] (Apply. e1 e2)) op args))
+  (Apply. op (Tuple. (vec args))))
 
 (defmethod -parse :Let [_ [_ bindings expr]]
   (->> bindings
@@ -166,7 +175,6 @@
 
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
-    (prn expr conformed)
     (if (s/invalid? conformed)
       (if (record? expr)
         expr
@@ -175,10 +183,13 @@
       (let [x (-parse (first conformed) expr)]
         (cond-> x (record? x) (assoc :expr expr))))))
 
-(->> '(fn [a b c] [a b c])
-     (hylo (fn [expr] (fn [env] (check/infer expr env)))
+(->> '(fn
+        ([a] [a])
+        ([a b] [a b])
+        ([a b c] [a b c]))
+     (ana ; (fn [expr] (fn [env] (check/infer expr env)))
            parse)
-    (#(% check/empty-env))
-    second
+    ;; (#(% check/empty-env))
+    ;; second
     ;; :type
  )

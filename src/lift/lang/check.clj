@@ -13,8 +13,8 @@
    [clojure.lang IPersistentVector IPersistentMap]
    [lift.lang.type
     Apply Arrow Const Container Env Extend If Lambda Let Literal Map Quantified
-    Record Restrict Row RowEmpty Scheme Select Substitution Symbol Unit Var
-    Vector]))
+    Record Restrict Row RowEmpty Scheme Select Substitution Symbol Tuple Unit
+    Var Vector]))
 
 (def id (sub {}))
 
@@ -82,6 +82,7 @@
 
 (p/defn unify
   ([[Arrow l r :as t1] [Arrow l' r' :as t2]]
+   (prn l r l' r')
    (let [s1 (unify l l')
          s2 (unify (substitute r s1) (substitute r' s1))]
      (compose s2 s1)))
@@ -92,7 +93,7 @@
 
   ([[Const a] [Const b] | (= a b)] id)
 
-  ([[Container tag1 & t1-args :as t1] [Container tag2 & t2-args :as t2]]
+  ([[Container tag1 t1-args :as t1] [Container tag2 t2-args :as t2]]
    (unify-compound t1 tag1 t1-args t2 tag2 t2-args))
 
   ([[RowEmpty _] [RowEmpty _]] id)
@@ -169,6 +170,12 @@
         t (-> expr first :type (substitute s))]
     (ret env s {:expr expr} (Container. type [t]))))
 
+(defn map-state [f state xs]
+  (reduce (fn [[s xs] x]
+            (let [[t y] (f s x)] [t (conj xs y)]))
+          [state []]
+          xs))
+
 (extend-protocol Syntax
   Literal
   (infer [expr env] (ret env id expr))
@@ -178,18 +185,23 @@
     (ret env id expr (instantiate (lookup env expr))))
 
   Lambda
-  (infer [[x e] env]
-    (let [[env tv] (fresh env (:a x))
-          env (assoc-in env [:type (:a x)] (Scheme. tv []))
+  (infer [[[xs] e] env]
+    (let [as (map :a xs)
+          [env tvs] (map-state fresh env as)
+          env (->> (map (fn [a tv] [a (Scheme. tv [])]) as tvs)
+                   (into {})
+                   (update env :type merge))
           [{s :sub :as env} e] (e env)
-          t (Arrow. (substitute tv s) (:type e))]
-      (ret env s (Lambda. (assoc x :type tv) e) t)))
+          t (Arrow. (Container. 'Tuple (mapv #(substitute % s) tvs)) (:type e))
+          xs (Tuple. (mapv #(assoc % :type %2) xs tvs))]
+      (ret env s (Lambda. xs e) t)))
 
   Apply
   (infer [[e1 e2] env]
     (let [[env tv] (fresh env)
           [{s1 :sub :as env} {t1 :type :as e1}] (e1 env)
           [{s2 :sub :as env} {t2 :type :as e2}] (e2 (substitute env s1))
+          _ (prn t1 t2)
           s3 (unify (substitute t1 s2) (Arrow. t2 tv))]
       (ret env (compose s3 s2 s1) (Apply. e1 e2) (substitute tv s3))))
 
@@ -235,4 +247,9 @@
           t (Record. (reduce (fn [row [k v]] (Row. k v row))
                                 (RowEmpty.)
                                 (map vector labels (map :type vals))))]
-      (ret env (:sub env) (Map. (into {} (map vector keys vals))) t))))
+      (ret env (:sub env) (Map. (into {} (map vector keys vals))) t)))
+
+  Tuple
+  (infer [[xs] env]
+    (let [[env xs] (map-state #(%2 %) env xs)]
+      (ret env (:sub env) (Tuple. xs) (Container. 'Tuple (map :type xs))))))
