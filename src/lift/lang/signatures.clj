@@ -105,24 +105,32 @@
 (defn arglist [fn-sig]
   (if (instance? Arrow fn-sig)
     (merge-with into
-                (let [{{a :a :as in} :in} fn-sig]
+                (let [{{a :a :as in} :in} fn-sig
+                      gs (gensym)]
                   (if (instance? Vargs in)
-                    {:arglist ['& a] :args [a]}
-                    {:arglist [a]    :args [[a]]}))
+                    {:arglist ['& gs] :args [gs]}
+                    {:arglist [gs]    :args [[gs]]}))
                 (arglist (:out fn-sig)))
     []))
 
 (defn impl-type [type]
   (parse-type-expr [:type-app (u/assert-conform ::type-app type)]))
 
+(defn q1 [x] (list 'quote x))
+
 (defn impl [path impls]
   (letfn [(f [{:keys [f arglist expr]}] `(fn ~f ~arglist ~expr))]
     (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
-      (assoc-in {} (map #(list 'quote %) path) (into {} (map (juxt :f f) c))))))
+      (assoc-in {} (map q1 path) (into {} (map (juxt (comp q1 :f) f) c))))))
 
-(impl '(Int)
- '((=    [x & xs] (apply c/= x xs))
-   (not= [x & xs] (apply c/not= x xs))))
+(defn arrseq [f]
+  (if (instance? Arrow f)
+    (cons (:in f) (arrseq (:out f)))
+    ()))
+
+;; (impl '(Int)
+;;  '((=    [x & xs] (apply c/= x xs))
+;;    (not= [x & xs] (apply c/not= x xs))))
 
 ;; {=
 ;;  {:f =,

@@ -1,7 +1,10 @@
 (ns lift.lang.interface
+  (:refer-clojure :exclude [type])
   (:require
-   [lift.lang.signatures :as sig]
-   [clojure.core :as c]))
+   [clojure.core :as c]
+   [lift.lang.signatures :as sig])
+  (:import
+   [lift.lang.type Var Vargs]))
 
 ;; requirements of interfaces:
 ;; type syntax parser & ast
@@ -9,14 +12,27 @@
 ;; what is the type of a thing at runtime?
 ;; does it matter that the underlying system has a different type?
 
+(def types
+  {Long 'Integer})
+
+(defn type [x]
+  (let [t (c/type x)]
+    (or (types t) t)))
+
 (def interfaces (atom {}))
 
 (defn- add-interface! [type fn-list])
 (defn- add-impl! [type impl fn-list])
 
-(defn- get-impl [d f sig]
-  ;; (get @interfaces f)
-  )
+(defn- get-impl [d vars f sig arglist]
+  (let [path (->> arglist
+                  (map (fn [s a]
+                         (and (instance? Var s)
+                              (contains? vars (:a s))
+                              (type a))) ;; TODO: and vargs?
+                       (sig/arrseq sig))
+                  (filterv identity))]
+    (get-in d (into path [f]))))
 
 (defmacro interface
   {:style/indent :defn}
@@ -30,17 +46,14 @@
                (fn [[f {:keys [sig impl]}]]
                  (let [{:keys [arglist args]} (sig/arglist sig)]
                    `((defn ~f ~arglist
-                       (let [impl# (or (get-impl (deref ~dict) ~f ~sig)
+                       (let [impl# (or (get-impl (deref ~dict)
+                                                 '~(set (rest t))
+                                                 '~f
+                                                 ~sig
+                                                 ~(vec (remove #{'&} arglist)))
                                        ~impl)]
                          (apply impl# (apply concat ~args)))))))))
        '~t)))
-
-(interface (Eq a)
-  (=    (a -> & a -> Boolean))
-  (not= (a -> & a -> Boolean))
-  (default
-   (=    [x & xs] (apply c/= x xs))
-   (not= [x & xs] (apply c/not= x xs))))
 
 (defmacro impl {:style/indent :defn}
   [type & impls]
@@ -50,9 +63,16 @@
        (swap! ~dict merge ~(sig/impl (rest type) impls))
        '~type)))
 
-(impl (Eq Int)
+(interface (Eq a)
+  (=    (a -> & a -> Boolean))
+  (not= (a -> & a -> Boolean))
+  (default
+   (=    [x & xs] (apply c/= x xs))
+   (not= [x & xs] (apply c/not= x xs))))
+
+(impl (Eq Integer)
   (=    [x & xs] (apply c/= x xs))
-  (not= [x & xs] (apply c/= x xs)))
+  (not= [x & xs] (apply c/not= x xs)))
 
 ;; (interface (Show a)
 ;;   show (a -> String))
