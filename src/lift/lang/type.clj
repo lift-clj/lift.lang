@@ -27,6 +27,10 @@
 (defrecord Arrow [in out]
   Indexed (nth [_ i _] (nth [in out] i nil)))
 
+(defrecord Vargs [a]
+  Indexed (nth [_ i _] (nth [a] i nil))
+  Show    (show [_] (format "& %s" (pr-str a))))
+
 (defrecord Env []
   Functor
   (-fmap [x f] (map-vals f x)))
@@ -231,6 +235,7 @@
 (defmethod print-method Var       [x w] (.write w (show x)))
 (defmethod print-method Arrow     [x w] (.write w (show x)))
 (defmethod print-method Container [x w] (.write w (show x)))
+(defmethod print-method Vargs     [x w] (.write w (show x)))
 
 (defmethod print-method Env    [x w]
   (.write w

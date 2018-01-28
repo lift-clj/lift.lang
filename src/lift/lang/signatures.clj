@@ -1,8 +1,12 @@
-(ns lift.t.signatures
+(ns lift.lang.signatures
   (:require
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
-   [lift.type :refer :all]))
+   [lift.lang.type :refer :all]
+   [clojure.core :as c])
+  (:import
+   [lift.lang.type
+    Arrow Const Constraint Container Literal Quantified Var Vargs]))
 
 ;; a, b, c, etc.
 (s/def ::var
@@ -10,8 +14,7 @@
 
 ;; a...
 (s/def ::vargs
-  (s/and simple-symbol?
-         #(re-matches #"^[a-zA-Z][a-z0-9]*\.\.\.$" (name %))))
+  (s/cat :& #{'&} :v ::var))
 
 ;; String, Functor, etc.
 (s/def ::type-name
@@ -23,29 +26,29 @@
          :args (s/+ (s/and ::type-expr #(not (s/valid? ::vargs %))))))
 
 ;; a -> (a -> b) -> c... -> b, Functor f -> f a
-(s/def ::lambda
+(s/def ::arrow
   (s/cat :a ::type-expr :-> #{'->} :b ::retype-expr))
 
 (s/def ::type-expr
-  (s/or :var       ::var
-        :vargs     ::vargs
-        :type-name ::type-name
-        :type-app  ::type-app
-        :lambda    ::lambda))
+  (s/alt :var       ::var
+         :vargs     ::vargs
+         :type-name ::type-name
+         :type-app  ::type-app
+         :arrow     (s/and seq? ::arrow)))
 
 (s/def ::retype-expr
   (s/alt :var       ::var
          :vargs     ::vargs
          :type-name ::type-name
          :type-app  ::type-app
-         :lambda    ::lambda))
+         :arrow     ::arrow))
 
 ;; x.y/z
 (s/def ::name symbol?)
 
 ;; (= a -> a... -> Boolean)
 (s/def ::signature
-  (s/cat :f ::name :sig ::type-expr))
+  (s/and seq? (s/cat :f ::name :sig ::type-expr)))
 
 (s/def ::default-impl
   (s/and seq? (s/cat :f symbol? :arglist vector? :expr any?)))
@@ -55,16 +58,13 @@
          :default (s/? (s/and seq? (s/cat :default #{'default}
                                           :impls (s/+ ::default-impl))))))
 
-(defn trim-vargs [x]
-  (symbol (string/replace (name x) #"...$" "")))
-
 (defn parse-type-expr [[t x]]
-  (case t
-    :var       (Var x)
-    :vargs     (Vargs (trim-vargs x))
-    :type-name (Name x)
-    :type-app  (App (parse-type-expr (:op x)) (mapv parse-type-expr (:args x)))
-    :lambda    (Fn (parse-type-expr (:a x)) (parse-type-expr (:b x)))))
+  (c/case t
+    :var       (Var. x)
+    :vargs     (Vargs. (:v x))
+    :type-name (Const. x)
+    :type-app  (Container. (parse-type-expr (:op x)) (mapv parse-type-expr (:args x)))
+    :arrow     (Arrow. (parse-type-expr (:a x)) (parse-type-expr (:b x)))))
 
 (defn parse [texpr]
   (let [c (s/conform ::signature texpr)]
@@ -77,7 +77,11 @@
 (defn parse-fn-list-default [expr]
   (let [c (s/conform ::interface-fn-list-default expr)]
     (if (s/invalid? c)
-      (throw (Exception. (str "Invalid interface signature " (pr-str expr))))
+      (throw
+       (Exception. (str "Invalid interface signature\n"
+                        (with-out-str (clojure.pprint/pprint expr))
+                        \newline
+                        (with-out-str (s/explain ::interface-fn-list-default expr)))))
       (reduce (fn [i {:keys [f arglist expr] :as x}]
                 (if (contains? i f)
                   (assoc-in i [f :impl] (list 'fn arglist expr))
@@ -88,35 +92,36 @@
                    (into {}))
               (-> c :default :impls)))))
 
-(parse-fn-list-default '(
-             =    (a -> a... -> Boolean)
-             not= (a -> a... -> Boolean)
-             (default
-              (=    [x y] (not (!= x y)))
-              (not= [x y] (not (= x y))))))
 
+(parse-fn-list-default
+ '(
+   (=    (& a -> Boolean))
+   (not= (& a -> Boolean))
+   (default
+    (=    [& xs] (apply c/= xs))
+    (not= [& xs] (apply c/not= xs)))))
 
-(defn arglist [fn-sig]
-  (if (instance? lift.type.Fn fn-sig)
-    (into (if (instance? lift.type.Vargs (.-a fn-sig))
-            ['& (gensym)]
-            [(gensym)])
-           (arglist (.-b fn-sig)))
-    []))
+;; (defn arglist [fn-sig]
+;;   (if (instance? lift.type.Fn fn-sig)
+;;     (into (if (instance? lift.type.Vargs (.-a fn-sig))
+;;             ['& (gensym)]
+;;             [(gensym)])
+;;            (arglist (.-b fn-sig)))
+;;     []))
 
-(parse-fn-list-default '(show (a -> String)))
+;; (parse-fn-list-default '(show (a -> String)))
 
-{=
- {:f =,
-  :sig
-  (lift.type/Fn
-   (lift.type/Var a)
-   (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
-  :impl (fn [x y] (not (!= x y)))},
- not=
- {:f not=,
-  :sig
-  (lift.type/Fn
-   (lift.type/Var a)
-   (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
-  :impl (fn [x y] (not (= x y)))}}
+;; {=
+;;  {:f =,
+;;   :sig
+;;   (lift.type/Fn
+;;    (lift.type/Var a)
+;;    (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
+;;   :impl (fn [x y] (not (!= x y)))},
+;;  not=
+;;  {:f not=,
+;;   :sig
+;;   (lift.type/Fn
+;;    (lift.type/Var a)
+;;    (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
+;;   :impl (fn [x y] (not (= x y)))}}

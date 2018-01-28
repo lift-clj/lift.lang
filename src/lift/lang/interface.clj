@@ -1,6 +1,6 @@
-(ns lift.t.interface
+(ns lift.lang.interface
   (:require
-   [lift.t.signatures :as sig]))
+   [lift.lang.signatures :as sig]))
 
 ;; requirements of interfaces:
 ;; type syntax parser & ast
@@ -23,10 +23,13 @@
   (let [fns (sig/parse-fn-list-default fn-list-defaults?)]
     (->> fns
          (map (fn [[f {:keys [sig impl]}]]
-                (let [arglist (sig/arglist sig)]
-                  `(defn ~f ~arglist
-                     (let [impl# (or (get-impl ~f ~arglist) ~impl)]
-                       (apply impl# ~@arglist))))))
+                (let [arglist (sig/arglist sig)
+                      dict (symbol (str f "-dispatch"))]
+                  `(do
+                     (def ~dict (atom {}))
+                     (defn ~f ~arglist
+                      (let [impl# (or (get-impl (deref ~dict) ~f ~arglist) ~impl)]
+                        (apply impl# ~@arglist)))))))
          (cons 'do))))
 
 (defmacro impl {:style/indent :defn} [& decl])
@@ -47,7 +50,7 @@
   map ((a -> b) -> f a -> f b))
 
 (interface (Functor m => Monad m)
-  >>=    (m a -> (a -> m b) -> m b)
+           (>>=    (m a -> (a -> m b) -> m b))
   >>     (m a -> m b -> m b)
   return (a -> m a)
   (default
