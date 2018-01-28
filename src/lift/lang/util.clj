@@ -1,4 +1,5 @@
-(ns lift.lang.util)
+(ns lift.lang.util
+  (:require [clojure.spec.alpha :as s]))
 
 (defn ns-qualify
   "Qualify symbol s by resolving it or using the current *ns*."
@@ -59,3 +60,11 @@
   (if (seq tail)
     (op a (curry op (cons b tail)))
     (op a b)))
+
+(defn assert-conform [spec x]
+  (let [c (s/conform spec x)]
+    (if (s/invalid? c)
+      (throw
+       (Exception. (format "Value %s does not conform to spec %s\n%s"
+                           x spec (with-out-str (s/explain spec x)))))
+      c)))

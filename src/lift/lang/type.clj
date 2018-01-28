@@ -22,8 +22,8 @@
   Indexed (nth [_ i _] (nth [] i nil)))
 (defrecord Const [x]
   Indexed (nth [_ i _] (nth [x] i nil)))
-(defrecord Var   [val]
-  Indexed (nth [_ i _] (nth [val] i nil)))
+(defrecord Var [a]
+  Indexed (nth [_ i _] (nth [a] i nil)))
 (defrecord Arrow [in out]
   Indexed (nth [_ i _] (nth [in out] i nil)))
 
@@ -197,13 +197,13 @@
 (extend-protocol Ftv
   Unit   (ftv [x] #{})
   Const  (ftv [x] #{})
-  Var    (ftv [x] #{(:val x)})
+  Var    (ftv [x] #{(:a x)})
   Arrow  (ftv [x] (union (ftv (:in x)) (ftv (:out x)))))
 
 (extend-protocol Substitutable
   Unit   (substitute [x s] x)
   Const  (substitute [x s] x)
-  Var    (substitute [x s] (get s (:val x) x))
+  Var    (substitute [x s] (get s (:a x) x))
   Arrow  (substitute [x s]
            (Arrow. (substitute (:in x) s) (substitute (:out x) s))))
 
@@ -262,7 +262,7 @@
 (extend-protocol Show
   Unit      (show [_] "()")
   Const     (show [x] (str (:x x)))
-  Var       (show [x] (pr-str (:val x)))
+  Var       (show [x] (pr-str (:a x)))
   Arrow     (show [x] (format "(%s -> %s)" (pr-str (:in x)) (pr-str (:out x))))
   Env       (show [x] (format "Γ %s" (string/join (map pr-str x))))
   Scheme    (show [x] (format "(Scheme %s %s)" (pr-str (:t x)) (pr-str (:vars x)))))

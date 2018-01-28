@@ -3,6 +3,7 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [lift.lang.type :refer :all]
+   [lift.lang.util :as u]
    [clojure.core :as c])
   (:import
    [lift.lang.type
@@ -23,7 +24,7 @@
 ;; Functor f, (Functor f), Either (Maybe a) b
 (s/def ::type-app
   (s/cat :op   (s/or :var ::var :type-name ::type-name)
-         :args (s/+ (s/and ::type-expr #(not (s/valid? ::vargs %))))))
+         :args (s/+ (s/& ::type-expr #(not (s/valid? ::vargs %))))))
 
 ;; a -> (a -> b) -> c... -> b, Functor f -> f a
 (s/def ::arrow
@@ -101,15 +102,27 @@
     (=    [& xs] (apply c/= xs))
     (not= [& xs] (apply c/not= xs)))))
 
-;; (defn arglist [fn-sig]
-;;   (if (instance? lift.type.Fn fn-sig)
-;;     (into (if (instance? lift.type.Vargs (.-a fn-sig))
-;;             ['& (gensym)]
-;;             [(gensym)])
-;;            (arglist (.-b fn-sig)))
-;;     []))
+(defn arglist [fn-sig]
+  (if (instance? Arrow fn-sig)
+    (merge-with into
+                (let [{{a :a :as in} :in} fn-sig]
+                  (if (instance? Vargs in)
+                    {:arglist ['& a] :args [a]}
+                    {:arglist [a]    :args [[a]]}))
+                (arglist (:out fn-sig)))
+    []))
 
-;; (parse-fn-list-default '(show (a -> String)))
+(defn impl-type [type]
+  (parse-type-expr [:type-app (u/assert-conform ::type-app type)]))
+
+(defn impl [path impls]
+  (letfn [(f [{:keys [f arglist expr]}] `(fn ~f ~arglist ~expr))]
+    (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
+      (assoc-in {} (map #(list 'quote %) path) (into {} (map (juxt :f f) c))))))
+
+(impl '(Int)
+ '((=    [x & xs] (apply c/= x xs))
+   (not= [x & xs] (apply c/not= x xs))))
 
 ;; {=
 ;;  {:f =,
