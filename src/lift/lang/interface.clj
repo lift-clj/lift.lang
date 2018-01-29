@@ -2,9 +2,11 @@
   (:refer-clojure :exclude [type])
   (:require
    [clojure.core :as c]
-   [lift.lang.signatures :as sig])
+   [lift.lang.signatures :as sig]
+   [lift.lang.type :as t]
+   [lift.lang.util :as u])
   (:import
-   [lift.lang.type Var Vargs]))
+   [lift.lang.type Constraint Quantified Scheme Var Vargs]))
 
 ;; requirements of interfaces:
 ;; type syntax parser & ast
@@ -37,22 +39,27 @@
 (defmacro interface
   {:style/indent :defn}
   [t & fn-list-defaults?]
-  (let [dict (first t)
+  (let [[class v] t
+        constraints [(Constraint. class v)]
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
-       (def ~dict (atom {}))
+       (def ~class (atom {}))
        ~@(->> fns
               (mapcat
                (fn [[f {:keys [sig impl]}]]
                  (let [{:keys [arglist args]} (sig/arglist sig)]
                    `((defn ~f ~arglist
-                       (let [impl# (or (get-impl (deref ~dict)
+                       (let [impl# (or (get-impl (deref ~class)
                                                  '~(set (rest t))
                                                  '~f
                                                  ~sig
                                                  ~(vec (remove #{'&} arglist)))
                                        ~impl)]
-                         (apply impl# (apply concat ~args)))))))))
+                         (apply impl# (apply concat ~args))))
+                     (swap! t/type-env assoc
+                            '~(u/resolve-sym f)
+                            (Scheme. (Quantified. ~constraints ~sig)
+                                     (t/ftv ~sig))))))))
        '~t)))
 
 (defmacro impl {:style/indent :defn}

@@ -183,13 +183,21 @@
       (let [x (-parse (first conformed) expr)]
         (cond-> x (record? x) (assoc :expr expr))))))
 
-(->> '(fn
-        ([a] [a])
-        ([a b] [a b])
-        ([a b c] [a b c]))
-     (ana ; (fn [expr] (fn [env] (check/infer expr env)))
+;; (->> '(fn
+;;         ([a] [a])
+;;         ([a b] [a b])
+;;         ([a b c] [a b c]))
+;;      (ana ; (fn [expr] (fn [env] (check/infer expr env)))
+;;            parse)
+;;     ;; (#(% check/empty-env))
+;;     ;; second
+;;     ;; :type
+;;  )
+
+(->> '(= 1 2 3)
+     (hylo (fn [expr] (fn [env] (check/infer expr env)))
            parse)
-    ;; (#(% check/empty-env))
-    ;; second
-    ;; :type
- )
+     (#(% (assoc check/empty-env :type @type-env)))
+     second
+     :type
+     )

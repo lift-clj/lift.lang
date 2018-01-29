@@ -14,7 +14,7 @@
    [lift.lang.type
     Apply Arrow Const Container Env Extend If Lambda Let Literal Map Quantified
     Record Restrict Row RowEmpty Scheme Select Substitution Symbol Tuple Unit
-    Var Vector]))
+    Var Vargs Vector]))
 
 (def id (sub {}))
 
@@ -82,14 +82,15 @@
 
 (p/defn unify
   ([[Arrow l r :as t1] [Arrow l' r' :as t2]]
-   (prn l r l' r')
    (let [s1 (unify l l')
          s2 (unify (substitute r s1) (substitute r' s1))]
      (compose s2 s1)))
 
   ([[Var a] t] (bind a t))
-
   ([t [Var a]] (bind a t))
+
+  ([[Vargs a] b] (prn a b) (unify (Container. 'Vargs [a]) b))
+  ([a [Vargs b]] (prn a b) (unify a (Container. 'Vargs [b])))
 
   ([[Const a] [Const b] | (= a b)] id)
 
@@ -140,10 +141,16 @@
         v (-> env :fresh (get a) first (->> (str a)) symbol Var.)]
     [(update-in env [:fresh a] rest) v]))
 
-(defn instantiate [{:keys [t vars]}]
-  (let [nvars (map (fn [a] (fresh a)) vars)
-        subst (sub (zipmap vars nvars))]
-    (substitute t subst)))
+(defn map-state [f state xs]
+  (reduce (fn [[s xs] x]
+            (let [[t y] (f s x)] [t (conj xs y)]))
+          [state []]
+          xs))
+
+(defn instantiate [env {:keys [t vars]}]
+  (let [[fresh nvars] (map-state fresh (:fresh env) vars)
+        subst       (sub (zipmap vars nvars))]
+    [(assoc env :fresh fresh) (substitute t subst)]))
 
 (defn generalize [env t]
   (Scheme. t (difference (ftv t) (ftv env))))
@@ -170,19 +177,14 @@
         t (-> expr first :type (substitute s))]
     (ret env s {:expr expr} (Container. type [t]))))
 
-(defn map-state [f state xs]
-  (reduce (fn [[s xs] x]
-            (let [[t y] (f s x)] [t (conj xs y)]))
-          [state []]
-          xs))
-
 (extend-protocol Syntax
   Literal
   (infer [expr env] (ret env id expr))
 
   Symbol
   (infer [expr env]
-    (ret env id expr (instantiate (lookup env expr))))
+    (let [[env t] (instantiate env (lookup env expr))]
+      (ret env id expr t)))
 
   Lambda
   (infer [[[xs] e] env]
@@ -198,10 +200,9 @@
 
   Apply
   (infer [[e1 e2] env]
-    (let [[env tv] (fresh env)
+    (let [[env tv] (fresh env 'a)
           [{s1 :sub :as env} {t1 :type :as e1}] (e1 env)
           [{s2 :sub :as env} {t2 :type :as e2}] (e2 (substitute env s1))
-          _ (prn t1 t2)
           s3 (unify (substitute t1 s2) (Arrow. t2 tv))]
       (ret env (compose s3 s2 s1) (Apply. e1 e2) (substitute tv s3))))
 
@@ -227,8 +228,8 @@
   Select
   (infer [[rec label] env]
     (let [[env {t1 :type}] (label env)
-          [env vtype] (fresh env)
-          [env btype] (fresh env)
+          [env vtype] (fresh env 'v)
+          [env btype] (fresh env 'b)
           rectype (Record. (Row. t1 vtype btype))
           [{s2 :sub :as env} {t2 :type :as rec}] (rec env)
           s3 (unify rectype t2)]

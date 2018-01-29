@@ -29,7 +29,11 @@
 
 (defrecord Vargs [a]
   Indexed (nth [_ i _] (nth [a] i nil))
-  Show    (show [_] (format "& %s" (pr-str a))))
+  Show    (show [_] (format "& %s" (pr-str a)))
+  Ftv     (ftv [_] #{a})
+  Substitutable (substitute [_ s] (Vargs. (get s a a)))
+  f/Functor (f/-map [x f] x)
+  )
 
 (defrecord Env []
   Functor
@@ -291,7 +295,7 @@
 (defn env [m]
   (merge (Env.) m))
 
-(def type-env (atom (env {})))
+(def type-env (atom {}))
 
 (defn ex-unknown-type [t]
   (throw (ex-info (format "Unknown Type %s" (pr-str t))
@@ -500,7 +504,7 @@
                                     `((lift.lang.type/def ~proj ~(list tuple '-> a))
                                       (defn ~proj [~'x]
                                         (nth ~'x ~n2)))))))))))))
-(def-tuples)
+;; (def-tuples)
 
 (defn unmatched-case-error []
   (throw (ex-info "Unmatched Case" {:type :unmatched-case-error})))
