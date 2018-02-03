@@ -26,6 +26,9 @@
   (s/cat :op   (s/or :var ::var :type-name ::type-name)
          :args (s/+ (s/& ::type-expr #(not (s/valid? ::vargs %))))))
 
+(s/def ::tuple
+  (s/and vector? (s/+ ::type-expr)))
+
 ;; a -> (a -> b) -> c... -> b, Functor f -> f a
 (s/def ::arrow
   (s/cat :a ::type-expr :-> #{'->} :b ::retype-expr))
@@ -35,6 +38,7 @@
          :vargs     ::vargs
          :type-name ::type-name
          :type-app  ::type-app
+         :tuple     ::tuple
          :arrow     (s/and seq? ::arrow)))
 
 (s/def ::retype-expr
@@ -42,6 +46,7 @@
          :vargs     ::vargs
          :type-name ::type-name
          :type-app  ::type-app
+         :tuple     ::tuple
          :arrow     ::arrow))
 
 ;; x.y/z
@@ -65,6 +70,7 @@
     :vargs     (Vargs. (:v x))
     :type-name (Const. x)
     :type-app  (Container. (parse-type-expr (:op x)) (mapv parse-type-expr (:args x)))
+    :tuple     (Container. 'Tuple (mapv parse-type-expr x))
     :arrow     (Arrow. (parse-type-expr (:a x)) (parse-type-expr (:b x)))))
 
 (defn parse [texpr]

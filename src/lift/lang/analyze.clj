@@ -194,7 +194,7 @@
 ;;     ;; :type
 ;;  )
 
-(->> '(= 1 2 3)
+(->> '[1 2]
      (hylo (fn [expr] (fn [env] (check/infer expr env)))
            parse)
      (#(% (assoc check/empty-env :type @type-env)))

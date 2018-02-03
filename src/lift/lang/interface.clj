@@ -71,8 +71,8 @@
        '~type)))
 
 (interface (Eq a)
-  (=    (a -> & a -> Boolean))
-  (not= (a -> & a -> Boolean))
+  (=    ([a & a] -> Boolean))
+  (not= ([a & a] -> Boolean))
   (default
    (=    [x & xs] (apply c/= x xs))
    (not= [x & xs] (apply c/not= x xs))))

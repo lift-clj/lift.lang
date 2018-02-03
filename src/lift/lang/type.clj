@@ -10,7 +10,7 @@
    [clojure.java.io :as io]
    [clojure.core :as c])
   (:import
-   [clojure.lang Indexed IPersistentVector]))
+   [clojure.lang IHashEq Indexed ISeq IPersistentVector]))
 
 (alias 'c 'clojure.core)
 
@@ -36,16 +36,21 @@
   )
 
 (defrecord Env []
-  Functor
-  (-fmap [x f] (map-vals f x)))
+  f/Functor
+  (f/-map [x f] (map-vals f x)))
 
 (defrecord VarSet [vs]
   Ftv
   (ftv [x] (set (mapcat ftv (vals vs))))
-  Functor
-  (-fmap [x f] (assoc x :vs (map-vals f vs))))
+  f/Functor
+  (f/-map [x f] (assoc x :vs (map-vals f vs))))
 
-(defrecord Scheme [t vars])
+(defrecord Scheme [t vars]
+  Show
+  (show [_]
+    (format "%s.%s"
+            (string/join " " (map #(format "∀%s" (pr-str %)) vars))
+            (pr-str t))))
 
 (deftype Container [tag args]
   clojure.lang.IHashEq
@@ -137,6 +142,38 @@
   (show [_]
     (format "%s => %s" (string/join "," (map pr-str constraints)) (pr-str a))))
 
+(deftype Predicated [pred t]
+  Indexed
+  (nth [_ i _] (nth [pred t] i nil))
+  Ftv
+  (ftv [_] (difference (ftv t) (ftv pred)))
+  Substitutable
+  (substitute [_ s]
+    (Predicated. (substitute pred s) (substitute t s)))
+  Show
+  (show [_]
+    (let [pred (if (and (seq? pred) (= (count pred) 1))
+                 (first pred)
+                 pred)]
+      (format "%s => %s" (pr-str pred) (pr-str t)))))
+
+(deftype Predicate [tag a]
+  IHashEq
+  (equals [_ other]
+    (and (instance? Predicate other) (= tag (.-tag other)) (= a (.-a other))))
+  (hasheq [_] (hash a))
+  (hashCode [_] (.hashCode a))
+  Indexed
+  (nth [_ i _] (nth [tag a] i nil))
+  Ftv
+  (ftv [_] (ftv a))
+  Substitutable
+  (substitute [_ s]
+    (Predicate. tag (substitute a s)))
+  Show
+  (show [_]
+    (format "%s %s" (pr-str tag) (pr-str a))))
+
 (defrecord Literal [a]
   Indexed (nth [_ i _] (c/case i 0 a nil))
   f/Functor (f/-map [x f] x))
@@ -221,13 +258,16 @@
   Env    (substitute [x s] (update x :type f/-map #(substitute % s)))
   Scheme (substitute [{:keys [vars t] :as x} s]
            (update x :t substitute (apply dissoc s vars)))
+  ISeq
+  (substitute [x s]
+    (f/map #(substitute % s) x))
   IPersistentVector
   (substitute [x s]
     (f/map #(substitute % s) x)))
 
 (defrecord Substitution []
-  Functor
-  (-fmap [x f] (map-vals f x))
+  f/Functor
+  (f/-map [x f] (map-vals f x))
   Show
   (show [x] (str (->> x
                       (map (fn [[k v]] (str (pr-str v) \/ (pr-str k))))
@@ -268,15 +308,13 @@
   Const     (show [x] (str (:x x)))
   Var       (show [x] (pr-str (:a x)))
   Arrow     (show [x] (format "(%s -> %s)" (pr-str (:in x)) (pr-str (:out x))))
-  Env       (show [x] (format "Γ %s" (string/join (map pr-str x))))
-  Scheme    (show [x] (format "(Scheme %s %s)" (pr-str (:t x)) (pr-str (:vars x)))))
+  Env       (show [x] (format "Γ %s" (string/join (map pr-str x)))))
 
 (extend-protocol Show
   Literal (show [x] (str (:a x)))
   Symbol  (show [x] (str (:a x)))
   Lambda  (show [[x e]] (format "(fn %s %s)" (pr-str x) (pr-str e)))
-  Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x))
-                            (string/join " " (map pr-str (:xs (:e2 x))))))
+  Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x)) (pr-str (:e2 x))))
   Let     (show [x] (format "(let [%s %s] %s)"
                             (pr-str (:x x))
                             (pr-str (:e1 x))
