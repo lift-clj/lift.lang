@@ -88,9 +88,12 @@
       (get _Gamma (u/resolve-sym a))
       (u/unbound-variable-error a)))
 
-(defn instantiate [{:keys [t vars]}]
+(defn instantiate [{:keys [t vars] :as x}]
+  (prn x)
   (let [nvars (map (comp t/->Var gensym) vars)
         subst (t/sub (zipmap vars nvars))]
+    (prn subst)
+    (prn (t/substitute t subst))
     (t/substitute t subst)))
 
 (defn release [t]
@@ -104,9 +107,27 @@
       (assume? p)
       (throw (Exception. (format "No instance of %s in Γ" (pr-str p))))))
 
-(defn with-pred [preds t]
-  (let [preds (distinct (remove nil? (flatten preds)))]
-    (if (seq preds) (Predicated. preds t) t)))
+(defn with-pred [_Gamma preds t]
+  (let [shed (partial remove #(or (nil? %) (contains? _Gamma %)))]
+    (or (some-> preds flatten shed distinct seq (Predicated. t))
+        t)))
+
+(defn rel-unify [_Gamma a b]
+  (prn a \, b)
+  (let [[[pa ta] [pb tb]] (map release [a b])
+        s  (unify ta tb)
+        ps (distinct (map #(t/substitute % s) (remove nil? (into pa pb))))]
+    (prn ps)
+    (every? (partial release? _Gamma) ps)
+    [s ps]))
+
+(defn cata [f x]
+  (f (f/map #(cata f %) x)))
+
+(defn hoist [t]
+  (letfn [(ps [x] (when (instance? Predicated x) (.-pred x)))
+          (un [x] (if (instance? Predicated x) (.-t x) x))]
+    (or (some-> (ps t) (Predicated. (un t))) t)))
 
 (p/defn infer
   ([_Gamma [Literal _ :as expr]] [id (:type expr)])
@@ -119,20 +140,17 @@
          [s t]   (infer _Gamma e)
          [p1 t1] (release t)
          [p2 t2] (release (t/substitute tv s))]
-     [s (with-pred [p1 p2] (Arrow. t2 t1))]))
+     (prn p1 p2)
+     [s (with-pred _Gamma [p1 p2] (Arrow. t2 t1))]))
 
   ([_Gamma [Apply e1 e2]]
     (let [tv      (Var. (gensym 'ξ))
+          _ (prn e1)
           [s1 t1] (infer _Gamma e1)
+          _ (prn t1)
           [s2 t2] (infer (t/substitute _Gamma s1) e2)
-          [p1 t1] (release t1)
-          [p2 t2] (release t2)
-          s3      (unify (t/substitute t1 s2) (Arrow. t2 tv))
-          p1      (some-> p1 (t/substitute s3))
-          p2      (some-> p2 (t/substitute s3))]
-      (every? (partial release? _Gamma) p1)
-      (every? (partial release? _Gamma) p2)
-      [(compose s3 s2 s1) (with-pred [p1 p2] (t/substitute tv s3))])))
+          [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
+      [(compose s3 s2 s1) (with-pred _Gamma ps (t/substitute tv s3))])))
 
 (defn lit [v t]
   (-> v Literal. (assoc :type (Const. t))))

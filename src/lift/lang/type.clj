@@ -20,12 +20,18 @@
 
 (defrecord Unit  []
   Indexed (nth [_ i _] (nth [] i nil)))
+
 (defrecord Const [x]
-  Indexed (nth [_ i _] (nth [x] i nil)))
+  Indexed (nth [_ i _] (nth [x] i nil))
+  f/Functor (f/-map [x _] x))
+
 (defrecord Var [a]
-  Indexed (nth [_ i _] (nth [a] i nil)))
+  Indexed (nth [_ i _] (nth [a] i nil))
+  f/Functor (f/-map [x f] (Var. (f a))))
+
 (defrecord Arrow [in out]
-  Indexed (nth [_ i _] (nth [in out] i nil)))
+  Indexed   (nth [_ i _] (nth [in out] i nil))
+  f/Functor (f/-map [_ f] (Arrow. (f in) (f out))))
 
 (defrecord Vargs [a]
   Indexed (nth [_ i _] (nth [a] i nil))

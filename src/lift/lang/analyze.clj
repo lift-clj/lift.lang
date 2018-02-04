@@ -12,16 +12,9 @@
    [lift.lang.type Apply Arrow Const Constraint Container Extend If Lambda Let
     Literal Map Quantified Restrict Select Symbol Tuple Var Variadic Vector]))
 
-(extend-protocol f/Functor
-  Object
-  (f/-map [x f] x)
-  ;; overriding the incorrect impl by lift.f.functor
-  clojure.lang.IFn
-  (f/-map [x f] x)
-  clojure.lang.AFn
-  (f/-map [x f] (comp f x))
-  clojure.lang.ISeq
-  (f/-map [x f] (map f x)))
+;; (extend-protocol f/Functor
+;;   ;; overriding the incorrect impl by lift.f.functor
+;;   )
 
 (defn cata [f x]
   (f (f/map #(cata f %) x)))

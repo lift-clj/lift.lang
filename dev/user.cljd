@@ -1,0 +1,17 @@
+(ns user
+  {:lang :lift/clojure}
+  )
+
+;; (t/def map
+;;   ([f : [a      ] -> b, xs : List a                          ] -> List b)
+;;   ([f : [a, b   ] -> c, xs : List a, ys : List b             ] -> List c)
+;;   ([f : [a, b, c] -> d, xs : List a, ys : List b, zs : List c] -> List d))
+
+(t/def map
+  ((& a ->> b) -> & (a) ->> (b))
+
+(t/def =
+  (Eq a => & a ->> Boolean))
+
+(t/def +
+  (Num a => & a ->> a))
