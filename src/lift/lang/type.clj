@@ -4,331 +4,146 @@
    [clojure.set :refer [difference union]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
-   [lift.f.functor :as f]
+   [lift.f.functor :as f :refer [Functor]]
+   [lift.lang.type.impl :as impl :refer [Show]]
    [lift.lang.util :refer :all]
    [clojure.walk :as walk]
    [clojure.java.io :as io]
-   [clojure.core :as c])
+   [clojure.core :as c]
+   [clojure.string :as str])
   (:import
    [clojure.lang IHashEq Indexed ISeq IPersistentVector]))
 
 (alias 'c 'clojure.core)
 
-(defprotocol Ftv (ftv [x]))
-(defprotocol Show (show [_]))
-(defprotocol Substitutable (substitute [x s]))
-
-(defrecord Unit  []
-  Indexed (nth [_ i _] (nth [] i nil)))
-
-(defrecord Const [x]
-  Indexed (nth [_ i _] (nth [x] i nil))
-  f/Functor (f/-map [x _] x))
-
-(defrecord Var [a]
-  Indexed (nth [_ i _] (nth [a] i nil))
-  f/Functor (f/-map [x f] (Var. (f a))))
-
-(defrecord Arrow [in out]
-  Indexed   (nth [_ i _] (nth [in out] i nil))
-  f/Functor (f/-map [_ f] (Arrow. (f in) (f out))))
-
-(defrecord Vargs [a]
-  Indexed (nth [_ i _] (nth [a] i nil))
-  Show    (show [_] (format "& %s" (pr-str a)))
-  Ftv     (ftv [_] #{a})
-  Substitutable (substitute [_ s] (Vargs. (get s a a)))
-  f/Functor (f/-map [x f] x)
-  )
-
-(defrecord Env []
-  f/Functor
-  (f/-map [x f] (map-vals f x)))
-
-(defrecord VarSet [vs]
-  Ftv
-  (ftv [x] (set (mapcat ftv (vals vs))))
-  f/Functor
-  (f/-map [x f] (assoc x :vs (map-vals f vs))))
-
-(defrecord Scheme [t vars]
-  Show
-  (show [_]
-    (format "%s.%s"
-            (string/join " " (map #(format "∀%s" (pr-str %)) vars))
-            (pr-str t))))
-
-(deftype Container [tag args]
-  clojure.lang.IHashEq
-  (equals [_ other] (and (instance? Container other) (= tag (.-tag other))))
-  (hasheq [_] (hash tag))
-  (hashCode [_] (.hashCode tag))
-  Indexed
-  (nth [_ i _] (nth [tag args] i nil))
-  Ftv
-  (ftv [_] (set (mapcat ftv args)))
-  Substitutable
-  (substitute [_ s]
-    (Container. tag (map #(substitute % s) args)))
-  Show
-  (show [x]
-    (if args
-      (format "(%s %s)" (str tag) (string/join ", " (map pr-str args)))
-      (str tag))))
-
-(deftype RowEmpty []
-  Indexed
-  (nth [_ i _] (nth [] i nil))
-  clojure.lang.IHashEq
-  (equals [_ other] (instance? RowEmpty other))
-  (hasheq [_] (hash {}))
-  (hashCode [_] (.hashCode {}))
-  Ftv
-  (ftv [_] #{})
-  Substitutable
-  (substitute [x s] x)
-  Show
-  (show [_] "{}"))
-
-(deftype Row [k v tail]
-  Indexed
-  (nth [_ i _] (nth [k v tail] i nil))
-  clojure.lang.IHashEq
-  (equals [_ other]
-    (and (instance? Row other) (= k (.-k other)) (= v (.-v other))))
-  (hasheq [_] (hash [k v]))
-  (hashCode [_] (.hashCode [k v]))
-  Ftv
-  (ftv [_] (union (ftv v) (ftv tail)))
-  Substitutable
-  (substitute [_ s]
-    (Row. (substitute k s) (substitute v s) (substitute tail s)))
-  Show
-  (show [x] (format "%s : %s, %s" (pr-str k) (pr-str v) (pr-str tail))))
-
-(deftype Record [row]
-  Indexed
-  (nth [_ i _] (nth [row] i nil))
-  clojure.lang.IHashEq
-  (equals [_ other] (and (instance? Record other) (= row (.-row other))))
-  (hasheq [_] (hash row))
-  (hashCode [_] (.hashCode row))
-  Ftv
-  (ftv [_] (ftv row))
-  Substitutable
-  (substitute [_ s] (Record. (substitute row s)))
-  Show
-  (show [x] (format "{%s}" (pr-str row))))
-
-(deftype Constraint [tag a]
-  clojure.lang.IHashEq
-  (equals [_ other] (and (instance? Constraint other)
-                         (= tag (.-tag other))
-                         (= a (.-a other))))
-  (hasheq [_] (hash a))
-  (hashCode [_] (.hashCode a))
-  Indexed
-  (nth [_ i _] (nth [a] i nil))
-  Ftv
-  (ftv [_] (ftv a))
-  Substitutable
-  (substitute [_ s] (Constraint. tag (substitute a s)))
-  Show
-  (show [_] (format "%s %s" (name tag) (pr-str a))))
-
-(deftype Quantified [constraints a]
-  Indexed
-  (nth [_ i _] (nth [constraints a] i nil))
-  Ftv
-  (ftv [_] (difference (ftv a) (set (mapcat ftv constraints))))
-  Substitutable
-  (substitute [_ s]
-    (Quantified. constraints (substitute a s)))
-  Show
-  (show [_]
-    (format "%s => %s" (string/join "," (map pr-str constraints)) (pr-str a))))
-
-(deftype Predicated [pred t]
-  Indexed
-  (nth [_ i _] (nth [pred t] i nil))
-  Ftv
-  (ftv [_] (difference (ftv t) (ftv pred)))
-  Substitutable
-  (substitute [_ s]
-    (Predicated. (substitute pred s) (substitute t s)))
-  Show
-  (show [_]
-    (let [pred (if (and (seq? pred) (= (count pred) 1))
-                 (first pred)
-                 pred)]
-      (format "%s => %s" (pr-str pred) (pr-str t)))))
-
-(deftype Predicate [tag a]
-  IHashEq
-  (equals [_ other]
-    (and (instance? Predicate other) (= tag (.-tag other)) (= a (.-a other))))
-  (hasheq [_] (hash a))
-  (hashCode [_] (.hashCode a))
-  Indexed
-  (nth [_ i _] (nth [tag a] i nil))
-  Ftv
-  (ftv [_] (ftv a))
-  Substitutable
-  (substitute [_ s]
-    (Predicate. tag (substitute a s)))
-  Show
-  (show [_]
-    (format "%s %s" (pr-str tag) (pr-str a))))
-
-(defrecord Literal [a]
-  Indexed (nth [_ i _] (c/case i 0 a nil))
-  f/Functor (f/-map [x f] x))
-
-(defrecord Symbol [a]
-  Indexed (nth [_ i _] (c/case i 0 a nil))
-  f/Functor (f/-map [x f] x))
-
-(defrecord Variadic [vfns]
-  Indexed (nth [_ i _] (nth [vfns] i nil))
-  f/Functor (f/-map [_ f] (Variadic. (f/map f vfns)))
-  Show      (show [_]
-              (->> vfns
-                   (map (fn [[xs e]] (format "(%s %s)" (pr-str xs) (pr-str e))))
-                   (string/join "\n ")
-                   (format "(fn\n %s)"))))
-
-(defrecord Lambda [x e]
-  Indexed (nth [_ i _] (c/case i 0 x 1 e nil))
-  f/Functor (f/-map [_ f] (Lambda. x (f e))))
-
-(defrecord Apply [e1 e2]
-  Indexed (nth [_ i _] (c/case i 0 e1 1 e2 nil))
-  f/Functor (f/-map [_ f] (Apply. (f e1) (f e2))))
-
-(defrecord Let [x e1 e2]
-  Indexed (nth [_ i _] (c/case i 0 x 1 e1 2 e2 nil))
-  f/Functor (f/-map [_ f] (Let. x (f e1) (f e2))))
-
-(defrecord If [cond then else]
-  Indexed (nth [_ i _] (c/case i 0 cond 1 then 2 else nil))
-  f/Functor (f/-map [_ f] (If. (f cond) (f then) (f else))))
-
-;; Records
-(defrecord Select [rec label]
-  Indexed (nth [_ i _] (c/case i 0 rec 1 label nil))
-  f/Functor (f/-map [_ f] (Select. (f rec) (f label))))
-
-(defrecord Extend   [rec label value])
-(defrecord Restrict [rec label])
-
-(defrecord Vector [xs]
-  Indexed       (nth [_ i _] (nth [xs] i nil))
-  f/Functor     (f/-map [_ f] (Vector. (f/-map xs f)))
-  Show          (show [_] (format "[%s]" (string/join " " (f/map pr-str xs))))
-  Substitutable (substitute [_ s] (Vector. (f/map #(substitute % s) xs)))
-  Ftv           (ftv [_] (set (mapcat ftv xs))))
-
-(defrecord Map [r]
-  f/Functor (f/-map [_ f] (Map. (f/-map r f)))
-  Show (show [_] (->> (map (fn [[k v]] (str k " " (pr-str v))) r)
-                      (string/join ", ")
-                      (format "{%s}"))))
-
-(defrecord Tuple [xs]
-  Indexed       (nth [_ i _] (nth [xs] i nil))
-  f/Functor     (f/-map [_ f] (Tuple. (f/-map xs f)))
-  Show          (show [_] (format "[%s]" (string/join " " (f/map pr-str xs))))
-  Substitutable (substitute [_ s] (Tuple. (f/map #(substitute % s) xs)))
-  Ftv           (ftv [_] (set (mapcat ftv xs))))
-
-(extend-protocol Ftv
-  Unit   (ftv [x] #{})
-  Const  (ftv [x] #{})
-  Var    (ftv [x] #{(:a x)})
-  Arrow  (ftv [x] (union (ftv (:in x)) (ftv (:out x)))))
+(defprotocol Ftv (-ftv [x]))
+(defprotocol Substitutable (-sub [x s]))
 
 (extend-protocol Substitutable
-  Unit   (substitute [x s] x)
-  Const  (substitute [x s] x)
-  Var    (substitute [x s] (get s (:a x) x))
-  Arrow  (substitute [x s]
-           (Arrow. (substitute (:in x) s) (substitute (:out x) s))))
+  Object (-sub [x _] x))
 
-(extend-protocol Ftv
-  Env               (ftv [x] (->> x :type vals (mapcat ftv) set))
-  Scheme            (ftv [x] (difference (ftv (:t x)) (set (:vars x))))
-  IPersistentVector (ftv [x] (set (mapcat ftv x)))
-  nil               (ftv [x] #{}))
+(impl/deftype (Unit)
+  Ftv           (-ftv [_] #{})
+  Substitutable (-sub [x _] x)
+  Show          (-show [_] "()"))
 
-(extend-protocol Substitutable
-  Env    (substitute [x s] (update x :type f/-map #(substitute % s)))
-  Scheme (substitute [{:keys [vars t] :as x} s]
-           (update x :t substitute (apply dissoc s vars)))
-  ISeq
-  (substitute [x s]
-    (f/map #(substitute % s) x))
-  IPersistentVector
-  (substitute [x s]
-    (f/map #(substitute % s) x)))
+(impl/deftype (Const x)
+  Ftv           (-ftv [_] #{})
+  Substitutable (-sub [x _] x)
+  Show          (-show [_] (name x)))
 
-(defrecord Substitution []
-  f/Functor
-  (f/-map [x f] (map-vals f x))
-  Show
-  (show [x] (str (->> x
-                      (map (fn [[k v]] (str (pr-str v) \/ (pr-str k))))
-                      (string/join ", ")
-                      (str "S[")) \])))
+(impl/deftype (Var a)
+  Ftv           (-ftv [_] #{a})
+  Substitutable (-sub [_ s] (get s a x))
+  Show          (-show [_] (name a)))
 
-(defmethod print-method Unit      [x w] (.write w (show x)))
-(defmethod print-method Const     [x w] (.write w (show x)))
-(defmethod print-method Var       [x w] (.write w (show x)))
-(defmethod print-method Arrow     [x w] (.write w (show x)))
-(defmethod print-method Container [x w] (.write w (show x)))
-(defmethod print-method Vargs     [x w] (.write w (show x)))
+(impl/deftype (Vargs a)
+  Ftv           (-ftv [_] #{a})
+  Show          (-show [_] (str "& " a))
+  Substitutable (-sub [_ s] (Vargs. (get s a a))))
 
-(defmethod print-method Env    [x w]
-  (.write w
-          (format "[Sub %s\nType %s]"
-                  (pr-str (:sub x))
-                  (pr-str (:type x)))))
+(impl/deftype (Arrow a b)
+  Ftv           (-ftv [_] (union a b))
+  Substitutable (-sub [_ s] (Arrow. a b))
+  Functor       (-map [_ f] (Arrow. (f a) (f b)))
+  Show          (-show [_] (format "(%s -> %s)" a b)))
 
-(defmethod print-method Scheme [x w] (.write w (show x)))
+(impl/deftype (Forall as t)
+  Ftv           (-ftv [x] (difference t as))
+  Substitutable (-sub [_ s] (Forall. (apply dissoc s as) t))
+  Show          (-show [_] (str (string/join " " (map #(str "∀" %) as)) \. t)))
 
-(defmethod print-method Substitution [x w] (.write w (show x)))
+(impl/deftype (Predicate tag a)
+  Ftv           (-ftv [_] a)
+  Substitutable (-sub [_ s] (Predicate. tag a))
+  Show          (-show [_] (format "%s %s" (name tag) a)))
 
-(defmethod print-method Literal  [x w] (.write w (show x)))
-(defmethod print-method Symbol   [x w] (.write w (show x)))
-(defmethod print-method Variadic [x w] (.write w (show x)))
-(defmethod print-method Lambda   [x w] (.write w (show x)))
-(defmethod print-method Apply    [x w] (.write w (show x)))
-(defmethod print-method Let      [x w] (.write w (show x)))
-(defmethod print-method If       [x w] (.write w (show x)))
+(impl/deftype (Predicated pred t)
+  Ftv           (-ftv [_] (difference t pred))
+  Substitutable (-sub [_ s] (Predicated. pred t))
+  Show          (-show [_] (str (string/join ", " pred) " => " t)))
 
-(defmethod print-method Vector  [x w] (.write w (show x)))
-(defmethod print-method Map     [x w] (.write w (show x)))
-(defmethod print-method Tuple   [x w] (.write w (show x)))
+(impl/deftype (Literal a)
+  Show (-show [_] (name a)))
 
-(extend-protocol Show
-  Unit      (show [_] "()")
-  Const     (show [x] (str (:x x)))
-  Var       (show [x] (pr-str (:a x)))
-  Arrow     (show [x] (format "(%s -> %s)" (pr-str (:in x)) (pr-str (:out x))))
-  Env       (show [x] (format "Γ %s" (string/join (map pr-str x)))))
+(impl/deftype (Symbol a)
+  Show (-show [_] (name a)))
 
-(extend-protocol Show
-  Literal (show [x] (str (:a x)))
-  Symbol  (show [x] (str (:a x)))
-  Lambda  (show [[x e]] (format "(fn %s %s)" (pr-str x) (pr-str e)))
-  Apply   (show [x] (format "(%s %s)" (pr-str (:e1 x)) (pr-str (:e2 x))))
-  Let     (show [x] (format "(let [%s %s] %s)"
-                            (pr-str (:x x))
-                            (pr-str (:e1 x))
-                            (pr-str (:e2 x))))
-  If      (show [x] (format "(if %s %s %s)"
-                            (pr-str (:cond x))
-                            (pr-str (:then x))
-                            (pr-str (:else x)))))
+(impl/deftype (Lambda x e)
+  Show (-show [_] (format "(fn [%s] %s)" x e)))
+
+(impl/deftype (Apply e1 e2)
+  Show    (-show [_] (format "(%s %s)" e1 e2))
+  Functor (-map [_ f] (Apply. (f e1) (f e2))))
+
+(impl/deftype (Let x e1 e2)
+  Show    (-show [_] (format "(let [%s %s] %s)" x e1 e2))
+  Functor (-map [_ f] (Let. x (f e1) (f e2))))
+
+(impl/deftype (If cond then else)
+  Show    (-show [_] (format "(if %s %s %s)" cond then else))
+  Functor (-map [_ f] (If. (f cond) (f then) (f else))))
+
+(impl/deftype (Container tag args)
+  Ftv           (-ftv [_] (set (apply concat args)))
+  Show          (-show [_]
+                  (if args
+                    (format "(%s %s)" (name tag) (string/join ", " args))
+                    (name tag)))
+  Substitutable (-sub [_ s] (Container. tag args)))
+
+(impl/deftype (RowEmpty)
+  Ftv           (-ftv [_] #{})
+  Show          (-show [_] "{}")
+  Substitutable (-sub [x _] x))
+
+(impl/deftype (Row k v tail)
+  Ftv           (-ftv [_] (union v tail))
+  Show          (-show [_] (format "%s : %s, %s" k v tail))
+  Substitutable (-sub [_ _] (Row. k v tail)))
+
+(impl/deftype (Record row)
+  Ftv           (-ftv [_] (ftv row))
+  Show          (-show [x] (format "{%s}" row))
+  Substitutable (-sub [_ s] (Record. row)))
+
+(impl/deftype (Variadic vfns)
+  Functor (-map [_ f] (Variadic. (f/-map vfns f)))
+  Show    (-show [_]
+            (->> vfns
+                 (map (fn [[xs e]] (format "(%s %s)" (pr-str xs) (pr-str e))))
+                 (string/join "\n ")
+                 (format "(fn\n %s)"))))
+
+(impl/deftype (Env t)
+  Ftv           (-ftv [_] (->> t vals (apply concat) set))
+  Functor       (-map [_ f] (f/-map t f))
+  Show          (-show [_] (str "Γ " x))
+  Substitutable (-sub [x s] (Env. t)))
+
+(impl/deftype (Vector xs)
+  Ftv           (-ftv [_] (set xs))
+  Functor       (-map [_ f] (Vector. (f/-map xs f)))
+  Show          (-show [_] (format "[%s]" (string/join " " xs)))
+  Substitutable (-sub [_ s] (Vector. xs)))
+
+(impl/deftype (Map r)
+  Functor (-map [_ f] (Map. (f/-map r f)))
+  Show    (-show [_] (->> (map (fn [[k v]] (str k " " v)) r)
+                          (string/join ", ")
+                          (format "{%s}"))))
+
+(impl/deftype (Tuple xs)
+  Ftv           (-ftv [_] (set (apply concat xs)))
+  Functor       (-map [_ f] (Tuple. (f/-map xs f)))
+  Show          (-show [_] (format "[%s]" (string/join " " xs)))
+  Substitutable (-sub [_ s] (Tuple. xs)))
+
+(impl/deftype (Substitution s)
+  Functor (-map [_ f] (f/-map s f))
+  Show    (-show [_] (->> (map (fn [[k v]] (str v \/ k)) s)
+                          (string/join ", ")
+                          (format "S[%s]"))))
 
 (defn arrow [in out]
   (Arrow. in out))

@@ -1,5 +1,5 @@
 (ns lift.lang.type.impl
-  (:refer-clojure :exclude [type])
+  (:refer-clojure :exclude [deftype])
   (:require
    [clojure.string :as string]
    [lift.f.functor :as f]
@@ -7,7 +7,7 @@
   (:import
    [clojure.lang ISeq]))
 
-(defprotocol Show (show [_]))
+(defprotocol Show (-show [_]))
 
 (defn ->sym [x]
   (cond
@@ -82,14 +82,15 @@
       (throw (Exception. (format "Key %s not part of type" ~'k))))))
 
 (defn show-impl [tag args]
-  `(show ~'[_]
-    (format "%s %s" ~(pr-str tag) (string/join " " (map pr-str ~args)))))
+  `(-show ~'[_]
+     (format "%s %s" ~(pr-str tag) (string/join " " (map pr-str ~args)))))
 
 (defn prn-impl [classname]
-  `(defmethod print-method ~classname [~'x ~'w] (.write ~'w (show ~'x))))
+  `(defmethod print-method ~classname [~'x ~'w] (.write ~'w (-show ~'x))))
 
 (defn functor-impl [tag args]
-  `(f/-map ~'[_ f] (new ~tag ~@(butlast args) (~'f ~(last args)))))
+  `(f/-map ~'[_ f] (new ~tag ~@(butlast args)
+                        ~@(if-let [l (last args)] [`(~'f ~l)] []))))
 
 (def default-ifaces
   '#{clojure.lang.IHashEq
@@ -125,9 +126,10 @@
        ~(vec (set/union default-ifaces ifaces))
        ~@(default-impls tag args ifaces))))
 
-(defmacro type
+(defmacro deftype
   {:style/indent [:defn :defn]}
   [[tag & args] & impls]
   (list 'do
         (deftype-expr tag (vec args) impls)
+        (prn-impl (base-classname tag))
         (list 'quote (qualify-sym tag))))

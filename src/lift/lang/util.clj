@@ -42,20 +42,6 @@
 (defn map-vals [f x]
   (into x (for [[k v] x] [k (f v)])))
 
-(defprotocol Functor
-  (-fmap [x f]))
-
-(extend-protocol Functor
-  clojure.lang.IPersistentMap
-  (-fmap [x f] (map-vals f x))
-  clojure.lang.PersistentArrayMap
-  (-fmap [x f] (map-vals f x))
-  clojure.lang.PersistentHashMap
-  (-fmap [x f] (map-vals f x)))
-
-(defn fmap [f x]
-  (-fmap x f))
-
 (defn curry [op [a b & tail]]
   (if (seq tail)
     (op a (curry op (cons b tail)))
