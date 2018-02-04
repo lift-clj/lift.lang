@@ -16,8 +16,15 @@
 
 (alias 'c 'clojure.core)
 
+(defn cata [f x]
+  (f (f/-map x #(cata f %))))
+
 (defprotocol Ftv (-ftv [x]))
 (defprotocol Substitutable (-sub [x s]))
+
+(def ftv (partial cata -ftv))
+(def show (partial cata impl/-show))
+(def substitute (partial cata -sub))
 
 (extend-protocol Substitutable
   Object (-sub [x _] x))
@@ -145,8 +152,8 @@
                           (string/join ", ")
                           (format "S[%s]"))))
 
-(defn arrow [in out]
-  (Arrow. in out))
+(defn arrow [a b]
+  (Arrow. a b))
 
 (defn sub [m]
   (merge (Substitution.) m))
