@@ -5,70 +5,76 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [lift.f.functor :as f :refer [Functor]]
-   [lift.lang.type.impl :as impl :refer [Show]]
+   [lift.lang.type.impl :as impl :refer [cata Show]]
    [lift.lang.util :refer :all]
    [clojure.walk :as walk]
    [clojure.java.io :as io]
    [clojure.core :as c]
    [clojure.string :as str])
   (:import
-   [clojure.lang IHashEq Indexed ISeq IPersistentVector]))
+   [clojure.lang
+    IHashEq ILookup Indexed ISeq IPersistentMap IPersistentVector]))
 
 (alias 'c 'clojure.core)
 
-(defn cata [f x]
-  (f (f/-map x #(cata f %))))
-
 (defprotocol Ftv (-ftv [x]))
-(defprotocol Substitutable (-sub [x s]))
+
+(extend-protocol Ftv
+  Object (-ftv [x] x))
 
 (def ftv (partial cata -ftv))
-(def show (partial cata impl/-show))
-(def substitute (partial cata -sub))
 
-(extend-protocol Substitutable
-  Object (-sub [x _] x))
+
+(defprotocol Sub (-sub [x s]))
+
+(extend-protocol Sub
+  Object (-sub [x s] (f/map #(% s) x))
+  nil    (-sub [_ _] nil))
+
+(defn substitute [x s]
+  (let [f (cata (fn [x'] (fn [s'] (-sub x' s'))) x)]
+    (f s)))
+
 
 (impl/deftype (Unit)
-  Ftv           (-ftv [_] #{})
-  Substitutable (-sub [x _] x)
-  Show          (-show [_] "()"))
+  Functor (-map  [x _] x)
+  Ftv     (-ftv  [_]   #{})
+  Show    (-show [_]   "()")
+  Sub     (-sub  [x _] x))
 
 (impl/deftype (Const x)
-  Ftv           (-ftv [_] #{})
-  Substitutable (-sub [x _] x)
-  Show          (-show [_] (name x)))
+  Functor (-map  [x _] x)
+  Ftv     (-ftv  [_]   #{})
+  Show    (-show [_]   x)
+  Sub     (-sub  [x _] x))
 
 (impl/deftype (Var a)
-  Ftv           (-ftv [_] #{a})
-  Substitutable (-sub [_ s] (get s a x))
-  Show          (-show [_] (name a)))
+  Ftv     (-ftv  [_]   #{a})
+  Sub     (-sub  [x s] (let [a' (a s)] (Var. (get s a' a')))))
 
 (impl/deftype (Vargs a)
-  Ftv           (-ftv [_] #{a})
-  Show          (-show [_] (str "& " a))
-  Substitutable (-sub [_ s] (Vargs. (get s a a))))
+  Ftv  (-ftv [_] #{a})
+  Show (-show [_] (str "& " a))
+  Sub  (-sub [_ s] (Vargs. (get s a a))))
+;;; TODO: decide whether the substitution subs a symbol or a var
 
 (impl/deftype (Arrow a b)
-  Ftv           (-ftv [_] (union a b))
-  Substitutable (-sub [_ s] (Arrow. a b))
-  Functor       (-map [_ f] (Arrow. (f a) (f b)))
-  Show          (-show [_] (format "(%s -> %s)" a b)))
+  Functor (-map [_ f] (Arrow. (f a) (f b)))
+  Ftv     (-ftv [_] (union a b))
+  Show    (-show [_] (format "(%s -> %s)" a b)))
 
 (impl/deftype (Forall as t)
-  Ftv           (-ftv [x] (difference t as))
-  Substitutable (-sub [_ s] (Forall. (apply dissoc s as) t))
-  Show          (-show [_] (str (string/join " " (map #(str "∀" %) as)) \. t)))
+  Ftv  (-ftv [x] (difference t as))
+  Show (-show [_] (str (string/join " " (map #(str "∀" %) as)) \. t))
+  Sub  (-sub [_ s] (Forall. as (t (apply dissoc s as)))))
 
 (impl/deftype (Predicate tag a)
-  Ftv           (-ftv [_] a)
-  Substitutable (-sub [_ s] (Predicate. tag a))
-  Show          (-show [_] (format "%s %s" (name tag) a)))
+  Show (-show [_] (format "%s %s" (name tag) a)))
 
-(impl/deftype (Predicated pred t)
-  Ftv           (-ftv [_] (difference t pred))
-  Substitutable (-sub [_ s] (Predicated. pred t))
-  Show          (-show [_] (str (string/join ", " pred) " => " t)))
+(impl/deftype (Predicated preds t)
+  Functor (-map [_ f] (Predicated. (f/-map preds f) (f t)))
+  Ftv     (-ftv [_] (difference t preds))
+  Show    (-show [_] (str (string/join ", " preds) " => " t)))
 
 (impl/deftype (Literal a)
   Show (-show [_] (name a)))
@@ -92,27 +98,23 @@
   Functor (-map [_ f] (If. (f cond) (f then) (f else))))
 
 (impl/deftype (Container tag args)
-  Ftv           (-ftv [_] (set (apply concat args)))
-  Show          (-show [_]
-                  (if args
-                    (format "(%s %s)" (name tag) (string/join ", " args))
-                    (name tag)))
-  Substitutable (-sub [_ s] (Container. tag args)))
+  Ftv  (-ftv [_] (set (apply concat args)))
+  Show (-show [_]
+         (if args
+           (format "(%s %s)" (name tag) (string/join ", " args))
+           (name tag))))
 
 (impl/deftype (RowEmpty)
-  Ftv           (-ftv [_] #{})
-  Show          (-show [_] "{}")
-  Substitutable (-sub [x _] x))
+  Ftv  (-ftv [_] #{})
+  Show (-show [_] "{}"))
 
 (impl/deftype (Row k v tail)
-  Ftv           (-ftv [_] (union v tail))
-  Show          (-show [_] (format "%s : %s, %s" k v tail))
-  Substitutable (-sub [_ _] (Row. k v tail)))
+  Ftv  (-ftv [_] (union v tail))
+  Show (-show [_] (format "%s : %s, %s" k v tail)))
 
 (impl/deftype (Record row)
-  Ftv           (-ftv [_] (ftv row))
-  Show          (-show [x] (format "{%s}" row))
-  Substitutable (-sub [_ s] (Record. row)))
+  Ftv  (-ftv [_] (ftv row))
+  Show (-show [x] (format "{%s}" row)))
 
 (impl/deftype (Variadic vfns)
   Functor (-map [_ f] (Variadic. (f/-map vfns f)))
@@ -123,16 +125,16 @@
                  (format "(fn\n %s)"))))
 
 (impl/deftype (Env t)
-  Ftv           (-ftv [_] (->> t vals (apply concat) set))
-  Functor       (-map [_ f] (f/-map t f))
-  Show          (-show [_] (str "Γ " x))
-  Substitutable (-sub [x s] (Env. t)))
+  Ftv     (-ftv  [_]   (->> t vals (apply concat) set))
+  ;; Functor (-map  [_ f] (Env. (f/-map t f)))
+  Show    (-show [x]   (str "Γ {" t "}"))
+  ;; Sub     (-sub  [_ s] (Env. (f/-map #(% s) t)))
+  )
 
 (impl/deftype (Vector xs)
-  Ftv           (-ftv [_] (set xs))
-  Functor       (-map [_ f] (Vector. (f/-map xs f)))
-  Show          (-show [_] (format "[%s]" (string/join " " xs)))
-  Substitutable (-sub [_ s] (Vector. xs)))
+  Functor (-map  [_ f] (Vector. (f/-map xs f)))
+  Ftv     (-ftv  [_]   (set xs))
+  Show    (-show [_]   (format "[%s]" (string/join " " xs))))
 
 (impl/deftype (Map r)
   Functor (-map [_ f] (Map. (f/-map r f)))
@@ -141,25 +143,25 @@
                           (format "{%s}"))))
 
 (impl/deftype (Tuple xs)
-  Ftv           (-ftv [_] (set (apply concat xs)))
-  Functor       (-map [_ f] (Tuple. (f/-map xs f)))
-  Show          (-show [_] (format "[%s]" (string/join " " xs)))
-  Substitutable (-sub [_ s] (Tuple. xs)))
+  Functor (-map  [_ f] (Tuple. (f/-map xs f)))
+  Ftv     (-ftv  [_]   (set (apply concat xs)))
+  Show    (-show [_]   (format "[%s]" (string/join " " xs))))
 
 (impl/deftype (Substitution s)
-  Functor (-map [_ f] (f/-map s f))
-  Show    (-show [_] (->> (map (fn [[k v]] (str v \/ k)) s)
-                          (string/join ", ")
-                          (format "S[%s]"))))
+  IPersistentMap
+  (without [_ k] (Substitution. (dissoc s k)))
+  ILookup
+  (valAt [_ k] (get s k))
+  ILookup
+  (valAt [_ k not-found] (get s k not-found))
+  Show
+  (-show [_] (format "S%s" s)))
 
-(defn arrow [a b]
-  (Arrow. a b))
+(defn sub [s]
+  (Substitution. s))
 
-(defn sub [m]
-  (merge (Substitution.) m))
-
-(defn env [m]
-  (merge (Env.) m))
+(defn env [e]
+  (Env. e))
 
 (def type-env (atom {}))
 
@@ -268,7 +270,7 @@
   (->> (map :type (:more ast))
        (cons (:type ast))
        (map construct)
-       (curry arrow)))
+       (curry #(Arrow. % %2))))
 
 (defmethod construct :product [[_ ast]]
   (let [{:keys [value-cons]} ast]
@@ -285,8 +287,8 @@
                                               (map :type (:more sum-cons)))))
         (dissoc :=))))
 
-(defmethod construct :rec-cons [[_ [_ {:keys [type-name recmap]}]]]
-  (Container. (resolve-sym type-name) [(f/map construct (VarSet. recmap))]))
+;; (defmethod construct :rec-cons [[_ [_ {:keys [type-name recmap]}]]]
+;;   (Container. (resolve-sym type-name) [(f/map construct (VarSet. recmap))]))
 
 (defmethod construct :record [[_ ast]]
   (-> ast
@@ -462,10 +464,10 @@
 ;;                         [(:value-cons parsed)]))
 ;;                    [type-cons]))))))
 
-(defmethod print-method Object [x w]
-  (if (satisfies? Show x)
-    (.write w (show x))
-    (#'clojure.core/print-object x w)))
+;; (defmethod print-method Object [x w]
+;;   (if (satisfies? Show x)
+;;     (.write w (show x))
+;;     (#'clojure.core/print-object x w)))
 
 (defn case-form [x & [pattern expr & more]]
   (if (vector? pattern)
@@ -507,7 +509,7 @@
       (prn (io/resource path)))
     (when (seq more) (recur more))))
 
-(prim Symbol)
-(lift.lang.type/def t/unmatched-case-error a)
-(lift.lang.type/def def (Symbol -> a -> ()))
-(lift.lang.type/def restrict (l -> {l a | r} ->  {| r}))
+;; (prim Symbol)
+;; (lift.lang.type/def t/unmatched-case-error a)
+;; (lift.lang.type/def def (Symbol -> a -> ()))
+;; (lift.lang.type/def restrict (l -> {l a | r} ->  {| r}))

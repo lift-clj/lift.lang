@@ -7,8 +7,9 @@
    [lift.lang.util :as u])
   (:import
    [lift.lang.type
-    Arrow Const Predicate Predicated Scheme Var
-    Literal Symbol Lambda Apply]))
+    Apply Arrow Const Forall Lambda Literal Predicate Predicated Symbol Var
+    Env
+    ]))
 
 (def id (t/sub {}))
 
@@ -62,38 +63,45 @@
 
   ([t1 t2] (u/unification-failure t1 t2)))
 
-(extend-protocol t/Substitutable
-  clojure.lang.IPersistentMap
-  (t/substitute [x s]
-    (f/map #(t/substitute % s) x))
-  clojure.lang.Keyword
-  (t/substitute [x _] x))
+;; (extend-protocol t/Substitutable
+;;   clojure.lang.IPersistentMap
+;;   (t/substitute [x s]
+;;     (f/map #(t/substitute % s) x))
+;;   clojure.lang.Keyword
+;;   (t/substitute [x _] x))
 
 (def _Gamma
-  {'eq (Scheme. (Predicated. (list (Predicate. 'Eq (Var. 'a)))
+  {'eq (Forall. #{'a}
+                (Predicated. (list (Predicate. 'Eq (Var. 'a)))
                              (Arrow. (Var. 'a)
                                      (Arrow. (Var. 'a)
-                                             (Const. 'Bool))))
-                #{'a})
-   '+ (Scheme. (Predicated. (list (Predicate. 'Num (Var. 'a)))
+                                             (Const. 'Bool)))))
+   '+ (Forall. #{'a}
+               (Predicated. (list (Predicate. 'Num (Var. 'a)))
                             (Arrow. (Var. 'a)
-                                    (Arrow. (Var. 'a) (Var. 'a))))
-               #{'a})
+                                    (Arrow. (Var. 'a) (Var. 'a)))))
    (Predicate. 'Eq (Const. 'Int)) ::static
    (Predicate. 'Num (Const. 'Int)) ::static
    })
 
-(defn lookup [_Gamma {a :a}]
+(t/substitute (Env. _Gamma) (t/sub {'a (Var. 'z)}))
+
+(f/map (constantly 1) (Predicated. [(Predicate. 'Eq (Const. 'Int))] 3))
+
+(t/env {'x (Var. 'y)})
+
+(defn lookup [_Gamma [a]]
+  (prn _Gamma a)
   (or (get _Gamma a)
       (get _Gamma (u/resolve-sym a))
       (u/unbound-variable-error a)))
 
 (defn instantiate [{:keys [t vars] :as x}]
-  (prn x)
-  (let [nvars (map (comp t/->Var gensym) vars)
+  ;; (prn x)
+  (let [nvars (map (comp #(Var. %) gensym) vars)
         subst (t/sub (zipmap vars nvars))]
-    (prn subst)
-    (prn (t/substitute t subst))
+    ;; (prn subst)
+    ;; (prn (t/substitute t subst))
     (t/substitute t subst)))
 
 (defn release [t]
@@ -113,11 +121,11 @@
         t)))
 
 (defn rel-unify [_Gamma a b]
-  (prn a \, b)
+  ;; (prn a \, b)
   (let [[[pa ta] [pb tb]] (map release [a b])
         s  (unify ta tb)
         ps (distinct (map #(t/substitute % s) (remove nil? (into pa pb))))]
-    (prn ps)
+    ;; (prn ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
@@ -136,18 +144,18 @@
 
   ([_Gamma [Lambda [a] e]]
    (let [tv      (Var. (gensym 'ξ))
-         _Gamma       (assoc _Gamma a (Scheme. tv #{}))
+         _Gamma       (assoc _Gamma a (Forall. #{} tv))
          [s t]   (infer _Gamma e)
          [p1 t1] (release t)
          [p2 t2] (release (t/substitute tv s))]
-     (prn p1 p2)
+     ;; (prn p1 p2)
      [s (with-pred _Gamma [p1 p2] (Arrow. t2 t1))]))
 
   ([_Gamma [Apply e1 e2]]
     (let [tv      (Var. (gensym 'ξ))
-          _ (prn e1)
+          ;; _ (prn e1)
           [s1 t1] (infer _Gamma e1)
-          _ (prn t1)
+          ;; _ (prn t1)
           [s2 t2] (infer (t/substitute _Gamma s1) e2)
           [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
       [(compose s3 s2 s1) (with-pred _Gamma ps (t/substitute tv s3))])))
