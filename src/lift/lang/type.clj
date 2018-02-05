@@ -40,17 +40,19 @@
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{})
   Show    (-show [_]   "()")
-  Sub     (-sub  [x _] x))
+  ;Sub     (-sub  [x _] x)
+  )
 
 (impl/deftype (Const x)
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{})
   Show    (-show [_]   x)
-  Sub     (-sub  [x _] x))
+  ;Sub     (-sub  [x _] x)
+  )
 
 (impl/deftype (Var a)
   Ftv     (-ftv  [_]   #{a})
-  Sub     (-sub  [x s] (let [a' (a s)] (Var. (get s a' a')))))
+  Sub     (-sub  [x s] (let [a' (a s)] (get s a' (Var. a')))))
 
 (impl/deftype (Vargs a)
   Ftv  (-ftv [_] #{a})
@@ -66,15 +68,16 @@
 (impl/deftype (Forall as t)
   Ftv  (-ftv [x] (difference t as))
   Show (-show [_] (str (string/join " " (map #(str "∀" %) as)) \. t))
-  Sub  (-sub [_ s] (Forall. as (t (apply dissoc s as)))))
+  Sub  (-sub [_ s] (Forall. as (t (apply dissoc s as))))
+  )
 
 (impl/deftype (Predicate tag a)
   Show (-show [_] (format "%s %s" (name tag) a)))
 
 (impl/deftype (Predicated preds t)
-  Functor (-map [_ f] (Predicated. (f/-map preds f) (f t)))
-  Ftv     (-ftv [_] (difference t preds))
-  Show    (-show [_] (str (string/join ", " preds) " => " t)))
+  Functor (-map  [_ f] (Predicated. (map f preds) (f t)))
+  Ftv     (-ftv  [_]   (difference t preds))
+  Show    (-show [_]   (str (string/join ", " preds) " => " t)))
 
 (impl/deftype (Literal a)
   Show (-show [_] (name a)))
@@ -155,7 +158,7 @@
   ILookup
   (valAt [_ k not-found] (get s k not-found))
   Show
-  (-show [_] (format "S%s" s)))
+  (-show [_] (format "S[%s]" s)))
 
 (defn sub [s]
   (Substitution. s))

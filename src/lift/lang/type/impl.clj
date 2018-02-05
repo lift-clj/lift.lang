@@ -7,6 +7,12 @@
   (:import
    [clojure.lang ISeq IPersistentMap]))
 
+(defn cata [f x]
+  (f (f/map #(cata f %) x)))
+
+(defn hylo [f g x]
+  (f (f/-map (g x) #(hylo f g %))))
+
 (defprotocol Type)
 
 (extend-protocol Functor
@@ -20,22 +26,15 @@
 
 (defprotocol Show (-show [_]))
 
+(defn show [x] (cata -show x))
 ;; (alter-var-root #'Show (fn [x] (assoc x :impls {})))
 
 (extend-protocol Show
   Object
   (-show [x] x)
   IPersistentMap
-  (-show [x] (->> (map (fn [[k v]] (str k " " v)) x) (string/join ", "))))
+  (-show [x] (->> (map (fn [[k v]] (str (show k) " " v)) x) (string/join ", "))))
 
-(defn cata [f x]
-  (f (f/map #(cata f %) x)))
-
-(defn hylo [f g x]
-  (f (f/-map (g x) #(hylo f g %))))
-
-(defn show [x]
-  (cata -show x))
 
 (defn ->sym [x]
   (cond

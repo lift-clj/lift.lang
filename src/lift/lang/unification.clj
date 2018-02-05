@@ -17,7 +17,6 @@
   (and (symbol? x) (= \ξ(first (name x)))))
 
 (defn occurs? [x expr]
-  ;; (prn 'occurs? x expr)
   (contains? (t/ftv expr) x))
 
 (declare unify)
@@ -45,12 +44,12 @@
         :else          (t/sub {a t})))
 
 (defn unify-arrow [l l' r r']
-  ;; (prn 'arr l l' r r')
   (let [s1 (unify l l')
         s2 (unify (t/substitute r s1) (t/substitute r' s1))]
     (compose s2 s1)))
 
 (defn assume? [p]
+  (prn 'assume? p)
   (xi? (.. p -a -a)))
 
 (p/defn unify
@@ -84,29 +83,23 @@
    (Predicate. 'Num (Const. 'Int)) ::static
    })
 
-(t/substitute (Env. _Gamma) (t/sub {'a (Var. 'z)}))
-
-(f/map (constantly 1) (Predicated. [(Predicate. 'Eq (Const. 'Int))] 3))
-
-(t/env {'x (Var. 'y)})
 
 (defn lookup [_Gamma [a]]
-  (prn _Gamma a)
+  (prn 'lkup (get _Gamma a))
   (or (get _Gamma a)
       (get _Gamma (u/resolve-sym a))
       (u/unbound-variable-error a)))
 
-(defn instantiate [{:keys [t vars] :as x}]
+(defn instantiate [[as t]]
   ;; (prn x)
-  (let [nvars (map (comp #(Var. %) gensym) vars)
-        subst (t/sub (zipmap vars nvars))]
-    ;; (prn subst)
+  (let [vars  (map (comp #(Var. %) gensym) as)
+        subst (t/sub (zipmap as vars))]
     ;; (prn (t/substitute t subst))
     (t/substitute t subst)))
 
 (defn release [t]
   (if (instance? Predicated t)
-    [(.-pred t) (.-t t)]
+    (vec t)
     [nil t]))
 
 (defn release? [_Gamma p]
@@ -121,11 +114,11 @@
         t)))
 
 (defn rel-unify [_Gamma a b]
-  ;; (prn a \, b)
+  (prn a \, b)
   (let [[[pa ta] [pb tb]] (map release [a b])
         s  (unify ta tb)
         ps (distinct (map #(t/substitute % s) (remove nil? (into pa pb))))]
-    ;; (prn ps)
+    (prn 'ps pa pb ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
