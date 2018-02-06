@@ -110,26 +110,17 @@
         t)))
 
 (p/defn split-pred
-  ([[Predicate tag p :as q]]
-   (prn 'hi tag p (instance? Predicate q))
-   (throw (Exception. "We have (Eq (Num Var a => Var a))"))
-   ;; ^^ that's fucked up
-   (if (instance? Predicate p)
-     [(Predicate. tag (:a p)) p]
-     [q]))
-  ([p]
-   [p]))
+  ([[Predicate tag [Predicated [[Predicate _ a :as p]]]]]
+   [(Predicate. tag a) p])
+  ([p] [p]))
 
 (defn rel-unify [_Gamma a b]
   (let [[[pa ta] [pb tb]] (map release [a b])
-        _ (prn 'pa pa pb)
         s  (unify ta tb)
-        _ (prn 's s)
         ps (->> (into pa pb)
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
-    (prn 'ps ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
@@ -175,10 +166,3 @@
                                 (Apply. (Symbol. 'a))))))
  (infer _Gamma)
  (second))
-
-
-;; (def eq (instantiate (_Gamma 'eq)))
-
-;; (unify (assoc _Gamma (Var. 'a1) ::assumed)
-;;        eq
-;;        (Arrow. (Var. 'a1) (Arrow. (Var. 'a1) (Var. 'b1))))
