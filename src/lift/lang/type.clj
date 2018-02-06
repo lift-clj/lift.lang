@@ -1,6 +1,7 @@
 (ns lift.lang.type
   (:refer-clojure :exclude [case def])
   (:require
+   [clojure.core.protocols :refer [IKVReduce]]
    [clojure.set :refer [difference union]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
@@ -151,6 +152,9 @@
   Show    (-show [_]   (format "[%s]" (string/join " " xs))))
 
 (impl/deftype (Substitution s)
+  IKVReduce
+  (kv-reduce [_ f init]
+    (let [[s'] init] (Substitution. (reduce-kv f s' s))))
   IPersistentMap
   (without [_ k] (Substitution. (dissoc s k)))
   ILookup

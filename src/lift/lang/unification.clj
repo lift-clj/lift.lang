@@ -49,7 +49,6 @@
     (compose s2 s1)))
 
 (defn assume? [p]
-  (prn 'assume? p)
   (xi? (.. p -a -a)))
 
 (p/defn unify
@@ -85,16 +84,13 @@
 
 
 (defn lookup [_Gamma [a]]
-  (prn 'lkup (get _Gamma a))
   (or (get _Gamma a)
       (get _Gamma (u/resolve-sym a))
       (u/unbound-variable-error a)))
 
 (defn instantiate [[as t]]
-  ;; (prn x)
   (let [vars  (map (comp #(Var. %) gensym) as)
         subst (t/sub (zipmap as vars))]
-    ;; (prn (t/substitute t subst))
     (t/substitute t subst)))
 
 (defn release [t]
@@ -113,12 +109,27 @@
     (or (some-> preds flatten shed distinct seq (Predicated. t))
         t)))
 
+(p/defn split-pred
+  ([[Predicate tag p :as q]]
+   (prn 'hi tag p (instance? Predicate q))
+   (throw (Exception. "We have (Eq (Num Var a => Var a))"))
+   ;; ^^ that's fucked up
+   (if (instance? Predicate p)
+     [(Predicate. tag (:a p)) p]
+     [q]))
+  ([p]
+   [p]))
+
 (defn rel-unify [_Gamma a b]
-  (prn a \, b)
   (let [[[pa ta] [pb tb]] (map release [a b])
+        _ (prn 'pa pa pb)
         s  (unify ta tb)
-        ps (distinct (map #(t/substitute % s) (remove nil? (into pa pb))))]
-    (prn 'ps pa pb ps)
+        _ (prn 's s)
+        ps (->> (into pa pb)
+                (remove nil?)
+                (mapcat #(split-pred (t/substitute % s)))
+                (distinct))]
+    (prn 'ps ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
@@ -141,14 +152,11 @@
          [s t]   (infer _Gamma e)
          [p1 t1] (release t)
          [p2 t2] (release (t/substitute tv s))]
-     ;; (prn p1 p2)
      [s (with-pred _Gamma [p1 p2] (Arrow. t2 t1))]))
 
   ([_Gamma [Apply e1 e2]]
     (let [tv      (Var. (gensym 'ξ))
-          ;; _ (prn e1)
           [s1 t1] (infer _Gamma e1)
-          ;; _ (prn t1)
           [s2 t2] (infer (t/substitute _Gamma s1) e2)
           [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
       [(compose s3 s2 s1) (with-pred _Gamma ps (t/substitute tv s3))])))
