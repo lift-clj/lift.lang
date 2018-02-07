@@ -1,16 +1,16 @@
 (ns lift.lang.analyze
-  (:refer-clojure :exclude [case])
+  (:refer-clojure :exclude [case type])
   (:require
    [clojure.core :as c]
    [clojure.spec.alpha :as s]
-   [lift.lang.check :as check]
    [lift.lang.type :refer :all]
    [lift.lang.util :refer [resolve-sym]]
    [lift.f.functor :as f]
-   [clojure.set :as set])
+   [clojure.set :as set]
+   [lift.lang.pattern :as p])
   (:import
-   [lift.lang.type Apply Arrow Const Constraint Container Extend If Lambda Let
-    Literal Map Quantified Restrict Select Symbol Tuple Var Variadic Vector]))
+   [lift.lang.type Apply Arrow Const Container If Lambda Let
+    Literal Map Predicate Predicated Symbol Tuple Var Variadic Vector]))
 
 ;; (extend-protocol f/Functor
 ;;   ;; overriding the incorrect impl by lift.f.functor
@@ -115,16 +115,21 @@
     (recur (Apply. op (first args)) (rest args))
     op))
 
+(p/defn type
+  ([[Literal a]]
+   (let [k (->> a (s/conform ::literal) first name (symbol "lift"))]
+     (c/case k
+       lift/Num (Predicated. [(Predicate. k (Var. 'a))] (Var. 'a))
+       (Const. k))))
+  ([x]
+   (throw
+    (Exception. (str "Cannot parse type of non-Literal: " x)))))
+
 (def -parse nil)
 (defmulti -parse (fn [t expr] t))
 
 (defmethod -parse :Lit [_ value]
-  (let [k (->> value (s/conform ::literal) first name (symbol "lift"))
-        t (c/case k
-            lift/Num (Quantified. [(Constraint. k (Var. 'a))] (Var. 'a))
-            (Const. k))]
-    (-> (Literal. value)
-        (assoc :type t))))
+  (Literal. value))
 
 (defmethod -parse :Def [_ [_ _ expr]]
   expr)
@@ -157,8 +162,8 @@
 
 (defmethod -parse :Rec [_ expr] (Map. expr))
 
-(defmethod -parse :Sel [_ [op arg]]
-  (Select. arg (-> (Literal. op) (assoc :type (Const. op)))))
+;; (defmethod -parse :Sel [_ [op arg]]
+;;   (Select. arg (-> (Literal. op) (assoc :type (Const. op)))))
 
 (defmethod -parse :Ext [_ [op r l a]]
   (Apply. op [r l a]))
@@ -187,10 +192,10 @@
 ;;     ;; :type
 ;;  )
 
-(->> '[1 2]
-     (hylo (fn [expr] (fn [env] (check/infer expr env)))
-           parse)
-     (#(% (assoc check/empty-env :type @type-env)))
-     second
-     :type
-     )
+;; (->> '[1 2]
+;;      (hylo (fn [expr] (fn [env] (check/infer expr env)))
+;;            parse)
+;;      (#(% (assoc check/empty-env :type @type-env)))
+;;      second
+;;      :type
+;;      )

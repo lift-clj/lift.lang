@@ -36,30 +36,25 @@
   (let [f (cata (fn [x'] (fn [s'] (-sub x' s'))) x)]
     (f s)))
 
-
 (impl/deftype (Unit)
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{})
-  Show    (-show [_]   "()")
-  ;Sub     (-sub  [x _] x)
-  )
+  Show    (-show [_]   "()"))
 
 (impl/deftype (Const x)
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{})
-  Show    (-show [_]   x)
-  ;Sub     (-sub  [x _] x)
-  )
+  Show    (-show [_]   x))
 
 (impl/deftype (Var a)
+  Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{a})
-  Sub     (-sub  [x s] (let [a' (a s)] (get s a' (Var. a')))))
+  Sub     (-sub  [x s] (get s a x)))
 
 (impl/deftype (Vargs a)
   Ftv  (-ftv [_] #{a})
   Show (-show [_] (str "& " a))
   Sub  (-sub [_ s] (Vargs. (get s a a))))
-;;; TODO: decide whether the substitution subs a symbol or a var
 
 (impl/deftype (Arrow a b)
   Functor (-map [_ f] (Arrow. (f a) (f b)))
@@ -67,10 +62,9 @@
   Show    (-show [_] (format "(%s -> %s)" a b)))
 
 (impl/deftype (Forall as t)
-  Ftv  (-ftv [x] (difference t as))
-  Show (-show [_] (str (string/join " " (map #(str "∀" %) as)) \. t))
-  Sub  (-sub [_ s] (Forall. as (t (apply dissoc s as))))
-  )
+  Ftv  (-ftv  [x]   (difference t as))
+  Show (-show [_]   (str (string/join " " (map #(str "∀" %) as)) \. t))
+  Sub  (-sub  [_ s] (Forall. as (t (apply dissoc s as)))))
 
 (impl/deftype (Predicate tag a)
   Show (-show [_] (format "%s %s" (name tag) a)))
@@ -81,13 +75,15 @@
   Show    (-show [_]   (str (string/join ", " preds) " => " t)))
 
 (impl/deftype (Literal a)
-  Show (-show [_] (name a)))
+  Functor (-map [x _] x)
+  Show    (-show [_] (str a)))
 
 (impl/deftype (Symbol a)
-  Show (-show [_] (name a)))
+  Functor (-map [x _] x)
+  Show    (-show [_] (format "(Symbol %s)" (str a))))
 
 (impl/deftype (Lambda x e)
-  Show (-show [_] (format "(fn [%s] %s)" x e)))
+  Show (-show [_] (format "(fn [%s] %s)" (impl/-show x) e)))
 
 (impl/deftype (Apply e1 e2)
   Show    (-show [_] (format "(%s %s)" e1 e2))
@@ -163,6 +159,13 @@
   (valAt [_ k not-found] (get s k not-found))
   Show
   (-show [_] (format "S[%s]" s)))
+
+(impl/deftype (SyntaxNode n t)
+  Functor (-map  [_ f] (SyntaxNode. (f n) t))
+  Show    (-show [_]   (str n (when t (str ":" t)))))
+
+(defn syntax [n]
+  (impl/cata #(if (instance? SyntaxNode %) % (SyntaxNode. % nil)) n))
 
 (defn sub [s]
   (Substitution. s))

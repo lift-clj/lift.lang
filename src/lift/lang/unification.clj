@@ -2,14 +2,15 @@
   (:require
    [clojure.set :refer [difference union]]
    [lift.f.functor :as f]
+   [lift.lang.analyze :as ana]
    [lift.lang.pattern :as p]
    [lift.lang.type :as t]
+   [lift.lang.type.impl :refer [cata]]
    [lift.lang.util :as u])
   (:import
    [lift.lang.type
     Apply Arrow Const Forall Lambda Literal Predicate Predicated Symbol Var
-    Env
-    ]))
+    Env SyntaxNode]))
 
 (def id (t/sub {}))
 
@@ -61,13 +62,6 @@
 
   ([t1 t2] (u/unification-failure t1 t2)))
 
-;; (extend-protocol t/Substitutable
-;;   clojure.lang.IPersistentMap
-;;   (t/substitute [x s]
-;;     (f/map #(t/substitute % s) x))
-;;   clojure.lang.Keyword
-;;   (t/substitute [x _] x))
-
 (def _Gamma
   {'eq (Forall. #{'a}
                 (Predicated. (list (Predicate. 'Eq (Var. 'a)))
@@ -83,7 +77,7 @@
    })
 
 
-(defn lookup [_Gamma [a]]
+(defn lookup [_Gamma a]
   (or (get _Gamma a)
       (get _Gamma (u/resolve-sym a))
       (u/unbound-variable-error a)))
@@ -115,45 +109,61 @@
   ([p] [p]))
 
 (defn rel-unify [_Gamma a b]
+  (prn 'rel-a a)
+  (prn 'rel-b b)
   (let [[[pa ta] [pb tb]] (map release [a b])
+        _ (prn 'rel pa pb)
+        _ (prn 'rel ta tb)
         s  (unify ta tb)
         ps (->> (into pa pb)
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
+    (prn 'ps ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
-(defn cata [f x]
-  (f (f/map #(cata f %) x)))
-
 (defn hoist [t]
-  (letfn [(ps [x] (when (instance? Predicated x) (.-pred x)))
-          (un [x] (if (instance? Predicated x) (.-t x) x))]
-    (or (some-> (ps t) (Predicated. (un t))) t)))
+  (letfn [(ps [x] (when (instance? Predicated x) (:preds x)))
+          (un [x] (if (instance? Predicated x) (:t x) x))]
+    (let [ts (->> t (mapcat ps) (remove nil?) distinct seq)
+          t  (f/map un t)]
+      (prn 'ts ts (map type ts))
+      (prn 't t)
+      (if ts (Predicated. ts t) t))))
 
-(p/defn infer
-  ([_Gamma [Literal _ :as expr]] [id (:type expr)])
+(p/defn -infer
+  ([_Gamma [Literal _ :as expr]] [id (ana/type expr)])
 
-  ([_Gamma [Symbol _ :as expr]] [id (instantiate (lookup _Gamma expr))])
+  ([_Gamma [Symbol a :as expr]] [id (instantiate (lookup _Gamma a))])
 
   ([_Gamma [Lambda [a] e]]
    (let [tv      (Var. (gensym 'ξ))
          _Gamma       (assoc _Gamma a (Forall. #{} tv))
-         [s t]   (infer _Gamma e)
+         [s t]   (e _Gamma)
          [p1 t1] (release t)
          [p2 t2] (release (t/substitute tv s))]
      [s (with-pred _Gamma [p1 p2] (Arrow. t2 t1))]))
 
   ([_Gamma [Apply e1 e2]]
     (let [tv      (Var. (gensym 'ξ))
-          [s1 t1] (infer _Gamma e1)
-          [s2 t2] (infer (t/substitute _Gamma s1) e2)
+          [s1 t1] (e1 _Gamma)
+          _ (prn 's1 s1)
+          _ (prn 't1 t1)
+          [s2 t2] (e2 (t/substitute _Gamma s1))
+          _ (prn 's2 s2)
+          _ (prn 't2 t2)
+          _ (mapv prn _Gamma)
           [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
       [(compose s3 s2 s1) (with-pred _Gamma ps (t/substitute tv s3))])))
 
-(defn lit [v t]
-  (-> v Literal. (assoc :type (Const. t))))
+(defn infer [_Gamma expr]
+  ((cata (fn [x]
+           (fn [env] (-infer env x))
+           ;;(update (-infer _Gamma expr) 1 #(SyntaxNode. expr %))
+           )
+         expr)
+   _Gamma))
 
 (->>
  (Lambda. (Symbol. 'a)
@@ -164,5 +174,7 @@
                                             (Apply. (Symbol. 'b))
                                             (Apply. (Symbol. 'c))))
                                 (Apply. (Symbol. 'a))))))
+ ;; (t/syntax)
  (infer _Gamma)
- (second))
+ (second)
+ )

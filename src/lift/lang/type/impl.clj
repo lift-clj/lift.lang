@@ -7,6 +7,9 @@
   (:import
    [clojure.lang ISeq IPersistentMap]))
 
+(defn ana [f x]
+  (f/map #(ana f %) (f x)))
+
 (defn cata [f x]
   (f (f/map #(cata f %) x)))
 
@@ -117,7 +120,7 @@
 
 (defn show-impl [tag args]
   `(-show ~'[_]
-     (format "%s %s" ~(pr-str tag) (string/join " " (map pr-str ~args)))))
+     (format "(%s %s)" ~(pr-str tag) (string/join " " (map pr-str ~args)))))
 
 (defn prn-impl [classname]
   `(defmethod print-method ~classname [~'x ~'w] (.write ~'w (show ~'x))))
@@ -127,11 +130,11 @@
                         ~@(if-let [l (last args)] [`(~'f ~l)] []))))
 
 (def default-ifaces
-  '#{clojure.lang.IHashEq
+  '#{clojure.lang.Associative
+     clojure.lang.IHashEq
      clojure.lang.ILookup
      clojure.lang.Indexed
      clojure.lang.ISeq
-     clojure.lang.Associative
      lift.f.functor.Functor
      lift.lang.type.impl.Show
      lift.lang.type.impl.Type})
@@ -159,7 +162,7 @@
     `(deftype*
        ~(type-name tag)
        ~(base-classname tag)
-       ~(vec args)
+       ~args
        :implements
        ~(vec (sort (set/union default-ifaces ifaces)))
        ~@(default-impls tag args ifaces)

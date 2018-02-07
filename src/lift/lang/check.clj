@@ -12,8 +12,8 @@
   (:import
    [clojure.lang IPersistentVector IPersistentMap]
    [lift.lang.type
-    Apply Arrow Const Container Env Extend If Lambda Let Literal Map Quantified
-    Record Restrict Row RowEmpty Scheme Select Substitution Symbol Tuple Unit
+    Apply Arrow Const Container Env If Lambda Let Literal Map
+    Record Row RowEmpty Scheme Select Substitution Symbol Tuple Unit
     Var Vargs Vector]))
 
 (def id (sub {}))
@@ -108,10 +108,10 @@
   ([[Record row] [Record row']]
    (unify row row'))
 
-  ([[Quantified c t :as t1] [Quantified c' t' :as t2]]
-   (let [s1 (unify-constraint c c')
-         s2 (unify t t')]
-     (compose s1 s2)))
+  ;; ([[Quantified c t :as t1] [Quantified c' t' :as t2]]
+  ;;  (let [s1 (unify-constraint c c')
+  ;;        s2 (unify t t')]
+  ;;    (compose s1 s2)))
 
   ([t1 t2]
    (unification-failure t1 t2)))
