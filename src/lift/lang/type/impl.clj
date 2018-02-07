@@ -85,7 +85,7 @@
     (boolean
      (or (identical? ~'this ~'other)
          (when (identical? (class ~'this) (class ~'other))
-           (every? true? (map = ~args (seq ~'other))))))))
+           (= ~args (seq ~'other)))))))
 
 (defn hasheq-impl [tag args]
   `(~'hasheq [~'_]

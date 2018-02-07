@@ -44,7 +44,7 @@
 (impl/deftype (Const x)
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{})
-  Show    (-show [_]   x))
+  Show    (-show [_]   (name x)))
 
 (impl/deftype (Var a)
   Functor (-map  [x _] x)

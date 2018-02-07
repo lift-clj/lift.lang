@@ -33,7 +33,10 @@
 
 (s/def ::literal
   (s/or :Boolean  boolean?
-        :Num      (s/or :i integer? :d double? :f float?)
+        :Int      integer?
+        :Double   double?
+        :Float    float?
+        ;; :Num      (s/or :i integer? :d double? :f float?)
         :String   string?
         :Class    class-name?
         :Symbol   symbol?
@@ -117,10 +120,10 @@
 
 (p/defn type
   ([[Literal a]]
-   (let [k (->> a (s/conform ::literal) first name (symbol "lift"))]
-     (c/case k
-       lift/Num (Predicated. [(Predicate. k (Var. 'a))] (Var. 'a))
-       (Const. k))))
+   (let [k (->> a (s/conform ::literal) first name symbol)]
+     ;; c/case k
+     ;; lift/Num (Predicated. [(Predicate. k (Var. 'a))] (Var. 'a))
+     (Const. k)))
   ([x]
    (throw
     (Exception. (str "Cannot parse type of non-Literal: " x)))))

@@ -109,17 +109,12 @@
   ([p] [p]))
 
 (defn rel-unify [_Gamma a b]
-  (prn 'rel-a a)
-  (prn 'rel-b b)
   (let [[[pa ta] [pb tb]] (map release [a b])
-        _ (prn 'rel pa pb)
-        _ (prn 'rel ta tb)
         s  (unify ta tb)
         ps (->> (into pa pb)
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
-    (prn 'ps ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
@@ -128,12 +123,11 @@
           (un [x] (if (instance? Predicated x) (:t x) x))]
     (let [ts (->> t (mapcat ps) (remove nil?) distinct seq)
           t  (f/map un t)]
-      (prn 'ts ts (map type ts))
-      (prn 't t)
       (if ts (Predicated. ts t) t))))
 
 (p/defn -infer
-  ([_Gamma [Literal _ :as expr]] [id (ana/type expr)])
+  ([_Gamma [Literal _ :as expr]]
+   [id (ana/type expr)])
 
   ([_Gamma [Symbol a :as expr]] [id (instantiate (lookup _Gamma a))])
 
@@ -148,12 +142,7 @@
   ([_Gamma [Apply e1 e2]]
     (let [tv      (Var. (gensym 'ξ))
           [s1 t1] (e1 _Gamma)
-          _ (prn 's1 s1)
-          _ (prn 't1 t1)
           [s2 t2] (e2 (t/substitute _Gamma s1))
-          _ (prn 's2 s2)
-          _ (prn 't2 t2)
-          _ (mapv prn _Gamma)
           [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
       [(compose s3 s2 s1) (with-pred _Gamma ps (t/substitute tv s3))])))
 
@@ -173,7 +162,7 @@
                                 (Apply. (-> (Symbol. '+)
                                             (Apply. (Symbol. 'b))
                                             (Apply. (Symbol. 'c))))
-                                (Apply. (Symbol. 'a))))))
+                                (Apply. (Literal. 5))))))
  ;; (t/syntax)
  (infer _Gamma)
  (second)
