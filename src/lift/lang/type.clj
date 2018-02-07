@@ -162,10 +162,7 @@
 
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))
-  Show    (-show [_]   (str n (when t (str ":" t)))))
-
-(defn syntax [n]
-  (impl/cata #(if (instance? SyntaxNode %) % (SyntaxNode. % nil)) n))
+  Show    (-show [_]   (str n (when t (str ":" (pr-str t))))))
 
 (defn sub [s]
   (Substitution. s))

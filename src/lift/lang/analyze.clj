@@ -126,7 +126,7 @@
      (Const. k)))
   ([x]
    (throw
-    (Exception. (str "Cannot parse type of non-Literal: " x)))))
+    (Exception. (str "Cannot parse type of non-Literal: " (pr-str x))))))
 
 (def -parse nil)
 (defmulti -parse (fn [t expr] t))
