@@ -4,10 +4,11 @@
    [clojure.string :as string]
    [lift.lang.type :refer :all]
    [lift.lang.util :as u]
-   [clojure.core :as c])
-  (:import
-   [lift.lang.type
-    Arrow Const Constraint Container Literal Quantified Var Vargs]))
+   [clojure.core :as c]
+   [lift.lang.pattern :as p]))
+
+(import-type-types)
+(import-container-types)
 
 ;; a, b, c, etc.
 (s/def ::var
@@ -24,7 +25,15 @@
 ;; Functor f, (Functor f), Either (Maybe a) b
 (s/def ::type-app
   (s/cat :op   (s/or :var ::var :type-name ::type-name)
-         :args (s/+ (s/& ::type-expr #(not (s/valid? ::vargs %))))))
+         :args (s/+ (s/& ::simple-expr))))
+
+(comment
+
+  (s/invalid? (s/conform ::type-app '[a & a]))
+
+  (s/valid? ::type-app '[a a])
+
+  )
 
 (s/def ::tuple
   (s/and vector? (s/+ ::type-expr)))
@@ -32,6 +41,13 @@
 ;; a -> (a -> b) -> c... -> b, Functor f -> f a
 (s/def ::arrow
   (s/cat :a ::type-expr :-> #{'->} :b ::retype-expr))
+
+(s/def ::simple-expr
+  (s/alt :var       ::var
+         :type-name ::type-name
+         :type-app  ::type-app
+         :tuple     ::tuple
+         :arrow     (s/and seq? ::arrow)))
 
 (s/def ::type-expr
   (s/alt :var       ::var
@@ -99,25 +115,43 @@
                    (into {}))
               (-> c :default :impls)))))
 
+(comment
+  (parse-fn-list-default
+  '(
+    (=    ([a & a] -> Boolean))
+    (not= ([a & a] -> Boolean))
+    (default
+     (=    [x & xs] (apply c/= x xs))
+     (not= [x & xs] (apply c/not= x xs)))))
 
-(parse-fn-list-default
- '(
-   (=    (& a -> Boolean))
-   (not= (& a -> Boolean))
-   (default
-    (=    [& xs] (apply c/= xs))
-    (not= [& xs] (apply c/not= xs)))))
+  )
 
 (defn arglist [fn-sig]
   (if (instance? Arrow fn-sig)
     (merge-with into
-                (let [{{a :a :as in} :in} fn-sig
+                (let [{{a :a :as in} :a} fn-sig
                       gs (gensym)]
                   (if (instance? Vargs in)
                     {:arglist ['& gs] :args [gs]}
                     {:arglist [gs]    :args [[gs]]}))
-                (arglist (:out fn-sig)))
+                (arglist (:b fn-sig)))
     []))
+
+(p/defn tuple-arglist
+  ([[Arrow [Container tag args]]]
+   (when (= tag 'Tuple)
+     (->> args
+          (map #(let [gs (gensym)]
+                  (if (instance? Vargs %)
+                    {:arglist ['& gs] :args [gs]}
+                    {:arglist [gs]    :args [[gs]]})))
+          (apply merge-with into))))
+  ([x] (throw (Exception. (format "Not a tupled function %s" (pr-str x))))))
+
+(comment
+  (tuple-arglist
+   (Arrow. (Container. 'Tuple [(Var. 'a) (Vargs. 'a)]) (Const. 'Bool))))
+
 
 (defn impl-type [type]
   (parse-type-expr [:type-app (u/assert-conform ::type-app type)]))
@@ -131,24 +165,5 @@
 
 (defn arrseq [f]
   (if (instance? Arrow f)
-    (cons (:in f) (arrseq (:out f)))
+    (cons (:a f) (arrseq (:b f)))
     ()))
-
-;; (impl '(Int)
-;;  '((=    [x & xs] (apply c/= x xs))
-;;    (not= [x & xs] (apply c/not= x xs))))
-
-;; {=
-;;  {:f =,
-;;   :sig
-;;   (lift.type/Fn
-;;    (lift.type/Var a)
-;;    (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
-;;   :impl (fn [x y] (not (!= x y)))},
-;;  not=
-;;  {:f not=,
-;;   :sig
-;;   (lift.type/Fn
-;;    (lift.type/Var a)
-;;    (lift.type/Fn (lift.type/Vargs a) (lift.type/Name Boolean))),
-;;   :impl (fn [x y] (not (= x y)))}}

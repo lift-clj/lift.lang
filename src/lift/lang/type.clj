@@ -53,7 +53,7 @@
 
 (impl/deftype (Vargs a)
   Ftv  (-ftv [_] #{a})
-  Show (-show [_] (str "& " a))
+  Show (-show [_] (format "(Vargs & %s)" a))
   Sub  (-sub [_ s] (Vargs. (get s a a))))
 
 (impl/deftype (Arrow a b)
@@ -73,6 +73,49 @@
   Functor (-map  [_ f] (Predicated. (map f preds) (f t)))
   Ftv     (-ftv  [_]   (difference t preds))
   Show    (-show [_]   (str (string/join ", " preds) " => " t)))
+
+(defmacro import-type-types []
+  `(import ~@`[Unit Const Var Vargs Arrow Forall Predicate Predicated]))
+
+
+(impl/deftype (Container tag args)
+  Ftv  (-ftv [_] (set (apply concat args)))
+  Show (-show [_]
+         (if args
+           (format "(%s %s)" (name tag) (string/join ", " args))
+           (name tag))))
+
+(impl/deftype (RowEmpty)
+  Ftv  (-ftv [_] #{})
+  Show (-show [_] "{}"))
+
+(impl/deftype (Row k v tail)
+  Ftv  (-ftv [_] (union v tail))
+  Show (-show [_] (format "%s : %s, %s" k v tail)))
+
+(impl/deftype (Record row)
+  Ftv  (-ftv [_] (ftv row))
+  Show (-show [x] (format "{%s}" row)))
+
+(impl/deftype (Vector xs)
+  Functor (-map  [_ f] (Vector. (f/-map xs f)))
+  Ftv     (-ftv  [_]   (set xs))
+  Show    (-show [_]   (format "[%s]" (string/join " " xs))))
+
+(impl/deftype (Map r)
+  Functor (-map [_ f] (Map. (f/-map r f)))
+  Show    (-show [_] (->> (map (fn [[k v]] (str k " " v)) r)
+                          (string/join ", ")
+                          (format "{%s}"))))
+
+(impl/deftype (Tuple xs)
+  Functor (-map  [_ f] (Tuple. (f/-map xs f)))
+  Ftv     (-ftv  [_]   (set (apply concat xs)))
+  Show    (-show [_]   (format "[%s]" (string/join " " xs))))
+
+(defmacro import-container-types []
+  `(import ~@`[Container RowEmpty Row Record Vector Map Tuple]))
+
 
 (impl/deftype (Literal a)
   Functor (-map [x _] x)
@@ -97,24 +140,12 @@
   Show    (-show [_] (format "(if %s %s %s)" cond then else))
   Functor (-map [_ f] (If. (f cond) (f then) (f else))))
 
-(impl/deftype (Container tag args)
-  Ftv  (-ftv [_] (set (apply concat args)))
-  Show (-show [_]
-         (if args
-           (format "(%s %s)" (name tag) (string/join ", " args))
-           (name tag))))
+(impl/deftype (SyntaxNode n t)
+  Functor (-map  [_ f] (SyntaxNode. (f n) t))
+  Show    (-show [_]   (str n (when t (str ":" (pr-str t))))))
 
-(impl/deftype (RowEmpty)
-  Ftv  (-ftv [_] #{})
-  Show (-show [_] "{}"))
-
-(impl/deftype (Row k v tail)
-  Ftv  (-ftv [_] (union v tail))
-  Show (-show [_] (format "%s : %s, %s" k v tail)))
-
-(impl/deftype (Record row)
-  Ftv  (-ftv [_] (ftv row))
-  Show (-show [x] (format "{%s}" row)))
+(defmacro import-syntax-types []
+  `(import ~@`[Literal Symbol Lambda Apply Let If SyntaxNode]))
 
 (impl/deftype (Variadic vfns)
   Functor (-map [_ f] (Variadic. (f/-map vfns f)))
@@ -131,22 +162,6 @@
   ;; Sub     (-sub  [_ s] (Env. (f/-map #(% s) t)))
   )
 
-(impl/deftype (Vector xs)
-  Functor (-map  [_ f] (Vector. (f/-map xs f)))
-  Ftv     (-ftv  [_]   (set xs))
-  Show    (-show [_]   (format "[%s]" (string/join " " xs))))
-
-(impl/deftype (Map r)
-  Functor (-map [_ f] (Map. (f/-map r f)))
-  Show    (-show [_] (->> (map (fn [[k v]] (str k " " v)) r)
-                          (string/join ", ")
-                          (format "{%s}"))))
-
-(impl/deftype (Tuple xs)
-  Functor (-map  [_ f] (Tuple. (f/-map xs f)))
-  Ftv     (-ftv  [_]   (set (apply concat xs)))
-  Show    (-show [_]   (format "[%s]" (string/join " " xs))))
-
 (impl/deftype (Substitution s)
   IKVReduce
   (kv-reduce [_ f init]
@@ -160,12 +175,10 @@
   Show
   (-show [_] (format "S[%s]" s)))
 
-(impl/deftype (SyntaxNode n t)
-  Functor (-map  [_ f] (SyntaxNode. (f n) t))
-  Show    (-show [_]   (str n (when t (str ":" (pr-str t))))))
-
 (defn sub [s]
   (Substitution. s))
+
+(def id (sub {}))
 
 (defn env [e]
   (Env. e))

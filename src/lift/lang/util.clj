@@ -23,8 +23,9 @@
 
 (defn unification-failure [a b]
   (throw
-   (ex-info (format "Cannot unify %s and %s" (pr-str a) (pr-str b))
-            {:type :unification-failure :a a :b b})))
+   (Exception. (format "Cannot unify %s and %s" (pr-str a) (pr-str b))
+            ;;{:type :unification-failure :a a :b b}
+               )))
 
 (defn unbound-variable-error [x]
   (throw

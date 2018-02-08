@@ -1,5 +1,5 @@
 (ns lift.lang.type.impl
-  (:refer-clojure :exclude [deftype])
+  (:refer-clojure :exclude [assoc deftype])
   (:require
    [clojure.string :as string]
    [lift.f.functor :as f :refer [Functor]]
@@ -17,6 +17,8 @@
   (f (f/-map (g x) #(hylo f g %))))
 
 (defprotocol Type)
+(defprotocol IVec (-vec [_]))
+(defprotocol IAssoc (-assoc [_ k v]))
 
 (extend-protocol Functor
 
@@ -77,9 +79,6 @@
 (defn ctor-name [tag]
   (symbol (kebab-case tag)))
 
-(defn seq-impl [args]
-  `(list ~@args))
-
 (defn equiv-impl [f args]
   `(~f ~'[this other]
     (boolean
@@ -98,11 +97,13 @@
     (clojure.lang.APersistentMap/mapHasheq
      ~(zipmap (map #(list 'quote %) args) args))))
 
-(defn seq-impl [args]
-  `(~'seq ~'[_] (list ~@args)))
+(defn ivec-impl [args]
+  `(~'-vec ~'[_] ~args))
+
+(defn empty-impl [ctor args])
 
 (defn assoc-impl [ctor args]
-  `(assoc ~'[_ k v]
+  `(-assoc ~'[_ k v]
     (case ~'k
       ~@(mapcat (fn [a] [(keyword a) (list* 'new ctor (replace {a 'v} args))])
                 args)
@@ -130,23 +131,24 @@
                         ~@(if-let [l (last args)] [`(~'f ~l)] []))))
 
 (def default-ifaces
-  '#{clojure.lang.Associative
-     clojure.lang.IHashEq
+  '#{clojure.lang.IHashEq
      clojure.lang.ILookup
      clojure.lang.Indexed
-     clojure.lang.ISeq
+     clojure.lang.IType
      lift.f.functor.Functor
+     lift.lang.type.impl.IAssoc
+     lift.lang.type.impl.IVec
      lift.lang.type.impl.Show
      lift.lang.type.impl.Type})
 
 (defn default-impls [tag args impls]
   (->> [[(equiv-impl 'equals args)]
-        [(equiv-impl 'equiv args)]
+        ;; [(equiv-impl 'equiv args)]
         [(hasheq-impl tag args)]
         [(hashcode-impl args)]
         [(list 'nth '[_ index] (list 'nth args 'index))]
         [(list 'nth '[_ index not-found] (list 'nth args 'index 'not-found))]
-        [(seq-impl args)]
+        [(ivec-impl args)]
         [(assoc-impl tag args)]
         (when-not (contains? impls 'clojure.lang.ILookup)
           (get-impl args))

@@ -3,11 +3,11 @@
   (:require
    [clojure.core :as c]
    [lift.lang.signatures :as sig]
-   [lift.lang.type :as t]
-   [lift.lang.util :as u])
-  (:import
-   [lift.lang.type Constraint Quantified Scheme Var Vargs]))
+   [lift.lang.type :as t :refer [import-type-types]]
+   [lift.lang.type.impl :as impl]
+   [lift.lang.util :as u]))
 
+(import-type-types)
 ;; requirements of interfaces:
 ;; type syntax parser & ast
 ;; pattern matching for impl?
@@ -32,7 +32,7 @@
                          (and (instance? Var s)
                               (contains? vars (:a s))
                               (type a))) ;; TODO: and vargs?
-                       (sig/arrseq sig))
+                       (impl/-vec sig))
                   (filterv identity))]
     (get-in d (into path [f]))))
 
@@ -40,26 +40,26 @@
   {:style/indent :defn}
   [t & fn-list-defaults?]
   (let [[class v] t
-        constraints [(Constraint. class v)]
+        constraints [(Predicate. class v)]
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
        (def ~class (atom {}))
        ~@(->> fns
               (mapcat
                (fn [[f {:keys [sig impl]}]]
-                 (let [{:keys [arglist args]} (sig/arglist sig)]
+                 (let [{:keys [arglist args]} (sig/tuple-arglist sig)]
                    `((defn ~f ~arglist
                        (let [impl# (or (get-impl (deref ~class)
                                                  '~(set (rest t))
                                                  '~f
-                                                 ~sig
+                                                 '~sig
                                                  ~(vec (remove #{'&} arglist)))
                                        ~impl)]
                          (apply impl# (apply concat ~args))))
                      (swap! t/type-env assoc
                             '~(u/resolve-sym f)
-                            (Scheme. (Quantified. ~constraints ~sig)
-                                     (t/ftv ~sig))))))))
+                            ~(Forall. (t/ftv sig)
+                                      (Predicated. constraints sig))))))))
        '~t)))
 
 (defmacro impl {:style/indent :defn}
@@ -80,6 +80,7 @@
 (impl (Eq Integer)
   (=    [x & xs] (apply c/= x xs))
   (not= [x & xs] (apply c/not= x xs)))
+
 
 ;; (interface (Show a)
 ;;   show (a -> String))
