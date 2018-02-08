@@ -1,3 +1,16 @@
 (ns user)
 
+;; (->>
+;;  (Lambda. (Symbol. 'a)
+;;           (Lambda. (Symbol. 'b)
+;;                    (Lambda. (Symbol. 'c)
+;;                             (-> (Symbol. 'eq)
+;;                                 (Apply. (-> (Symbol. '+)
+;;                                             (Apply. (Symbol. 'b))
+;;                                             (Apply. (Symbol. 'c))))
+;;                                 (Apply. (Symbol. 'a))))))
+;;  (infer _Gamma)
+;;  (second)
+;;  (:t)
+;;  )
 ;; (lift.lang/require [lib.a.thing :as a])

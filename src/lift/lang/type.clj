@@ -57,13 +57,13 @@
   Sub  (-sub [_ s] (Vargs. (get s a a))))
 
 (impl/deftype (Arrow a b)
-  Functor (-map [_ f] (Arrow. (f a) (f b)))
-  Ftv     (-ftv [_] (union a b))
-  Show    (-show [_] (format "(%s -> %s)" a b)))
+  Functor (-map  [_ f] (Arrow. (f a) (f b)))
+  Ftv     (-ftv  [_]   (union a b))
+  Show    (-show [_]   (format "(%s -> %s)" a b)))
 
 (impl/deftype (Forall as t)
   Ftv  (-ftv  [x]   (difference t as))
-  Show (-show [_]   (str (string/join " " (map #(str "∀" %) as)) \. t))
+  Show (-show [_]  (prn as t) (str (string/join " " (map #(str "∀" %) as)) \. t))
   Sub  (-sub  [_ s] (Forall. as (t (apply dissoc s as)))))
 
 (impl/deftype (Predicate tag a)

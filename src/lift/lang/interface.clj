@@ -40,7 +40,7 @@
   {:style/indent :defn}
   [t & fn-list-defaults?]
   (let [[class v] t
-        constraints [(Predicate. class v)]
+        constraints [(Predicate. class (Var. v))]
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
        (def ~class (atom {}))

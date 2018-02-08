@@ -5,25 +5,25 @@
    [lift.lang.unification :refer [compose unify]]
    [lift.lang.util :as u]
    [lift.lang.type :as t :refer [id import-syntax-types import-type-types]]
-   [lift.lang.type.impl :refer [cata]]
+   [lift.lang.type.impl :refer [cata -vec]]
    [lift.lang.analyze :as ana]))
 
 (import-type-types)
 (import-syntax-types)
 
-(def _Gamma
-  {'eq (Forall. #{'a}
-                (Predicated. (list (Predicate. 'Eq (Var. 'a)))
-                             (Arrow. (Var. 'a)
-                                     (Arrow. (Var. 'a)
-                                             (Const. 'Bool)))))
-   '+ (Forall. #{'a}
-               (Predicated. (list (Predicate. 'Num (Var. 'a)))
-                            (Arrow. (Var. 'a)
-                                    (Arrow. (Var. 'a) (Var. 'a)))))
-   (Predicate. 'Eq (Const. 'Int)) ::static
-   (Predicate. 'Num (Const. 'Int)) ::static
-   })
+;; (def _Gamma
+;;   {'eq (Forall. #{'a}
+;;                 (Predicated. (list (Predicate. 'Eq (Var. 'a)))
+;;                              (Arrow. (Var. 'a)
+;;                                      (Arrow. (Var. 'a)
+;;                                              (Const. 'Bool)))))
+;;    '+ (Forall. #{'a}
+;;                (Predicated. (list (Predicate. 'Num (Var. 'a)))
+;;                             (Arrow. (Var. 'a)
+;;                                     (Arrow. (Var. 'a) (Var. 'a)))))
+;;    (Predicate. 'Eq (Const. 'Int)) ::static
+;;    (Predicate. 'Num (Const. 'Int)) ::static
+;;    })
 
 (defn xi? [x]
   (and (symbol? x) (= \ξ(first (name x)))))
@@ -36,17 +36,18 @@
       (get _Gamma (u/resolve-sym a))
       (u/unbound-variable-error a)))
 
-(defn instantiate [[as t]]
+(defn instantiate [[as t :as x]]
   (let [vars  (map (comp #(Var. %) gensym) as)
         subst (t/sub (zipmap as vars))]
     (t/substitute t subst)))
 
 (defn release [t]
   (if (instance? Predicated t)
-    (vec t)
+    (-vec t)
     [nil t]))
 
 (defn release? [_Gamma p]
+  (prn p)
   (or (nil? p)
       (contains? _Gamma p)
       (assume? p)
@@ -69,13 +70,14 @@
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
+    (prn ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
 (defn hoist [t]
   (letfn [(ps [x] (when (instance? Predicated x) (:preds x)))
           (un [x] (if (instance? Predicated x) (:t x) x))]
-    (let [ts (->> t (mapcat ps) (remove nil?) distinct seq)
+    (let [ts (->> t -vec (mapcat ps) (remove nil?) distinct seq)
           t  (f/map un t)]
       (if ts (Predicated. ts t) t))))
 
@@ -107,16 +109,12 @@
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
 
-(->>
- (Lambda. (Symbol. 'a)
-          (Lambda. (Symbol. 'b)
-                   (Lambda. (Symbol. 'c)
-                            (-> (Symbol. 'eq)
-                                (Apply. (-> (Symbol. '+)
-                                            (Apply. (Symbol. 'b))
-                                            (Apply. (Symbol. 'c))))
-                                (Apply. (Symbol. 'a))))))
- (infer _Gamma)
- (second)
- (:t)
- )
+(->> (Lambda. (Symbol. 'a)
+              (Lambda. (Symbol. 'b)
+                       (-> (Symbol. '=)
+                           (Apply. (Symbol. 'a))
+                           (Apply. (Symbol. 'b)))))
+     (infer @lift.lang.type/type-env)
+     ;; (second)
+     ;; (:t)
+     )

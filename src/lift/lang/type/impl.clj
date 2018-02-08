@@ -16,23 +16,12 @@
 (defn hylo [f g x]
   (f (f/-map (g x) #(hylo f g %))))
 
-(defprotocol Type)
-(defprotocol IVec (-vec [_]))
+(defprotocol IVec   (-vec [_]))
 (defprotocol IAssoc (-assoc [_ k v]))
-
-(extend-protocol Functor
-
-  ;; Type (-map [x _] x)
-  ;; Object (-map [x _] x)
-  ;; nil    (-map [_ f] nil)
-  )
-
-;; (alter-var-root #'Functor (fn [x] (update x :impls dissoc java.lang.Object)))
-
-(defprotocol Show (-show [_]))
+(defprotocol Show   (-show [_]))
+(defprotocol Type)
 
 (defn show [x] (cata -show x))
-;; (alter-var-root #'Show (fn [x] (assoc x :impls {})))
 
 (extend-protocol Show
   Object
@@ -99,8 +88,6 @@
 
 (defn ivec-impl [args]
   `(~'-vec ~'[_] ~args))
-
-(defn empty-impl [ctor args])
 
 (defn assoc-impl [ctor args]
   `(-assoc ~'[_ k v]

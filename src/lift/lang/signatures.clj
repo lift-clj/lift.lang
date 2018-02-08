@@ -86,7 +86,7 @@
     :vargs     (Vargs. (:v x))
     :type-name (Const. x)
     :type-app  (Container. (parse-type-expr (:op x)) (mapv parse-type-expr (:args x)))
-    :tuple     (Container. 'Tuple (mapv parse-type-expr x))
+    :tuple     (Tuple. (mapv parse-type-expr x))
     :arrow     (Arrow. (parse-type-expr (:a x)) (parse-type-expr (:b x)))))
 
 (defn parse [texpr]
@@ -138,19 +138,18 @@
     []))
 
 (p/defn tuple-arglist
-  ([[Arrow [Container tag args]]]
-   (when (= tag 'Tuple)
-     (->> args
-          (map #(let [gs (gensym)]
-                  (if (instance? Vargs %)
-                    {:arglist ['& gs] :args [gs]}
-                    {:arglist [gs]    :args [[gs]]})))
-          (apply merge-with into))))
+  ([[Arrow [Tuple xs]]]
+   (->> xs
+        (map #(let [gs (gensym)]
+                (if (instance? Vargs %)
+                  {:arglist ['& gs] :args [gs]}
+                  {:arglist [gs]    :args [[gs]]})))
+        (apply merge-with into)))
   ([x] (throw (Exception. (format "Not a tupled function %s" (pr-str x))))))
 
 (comment
   (tuple-arglist
-   (Arrow. (Container. 'Tuple [(Var. 'a) (Vargs. 'a)]) (Const. 'Bool))))
+   (Arrow. (Tuple. [(Var. 'a) (Vargs. 'a)]) (Const. 'Bool))))
 
 
 (defn impl-type [type]

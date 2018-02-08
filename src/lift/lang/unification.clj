@@ -4,13 +4,9 @@
    [lift.f.functor :as f]
    [lift.lang.analyze :as ana]
    [lift.lang.pattern :as p]
-   [lift.lang.type :as t]
+   [lift.lang.type :as t :refer [import-type-types]]
    [lift.lang.type.impl :refer [cata]]
-   [lift.lang.util :as u])
-  (:import
-   [lift.lang.type
-    Apply Arrow Const Forall Lambda Literal Predicate Predicated Symbol Var
-    Env SyntaxNode]))
+   [lift.lang.util :as u]))
 
 (def id (t/sub {}))
 
