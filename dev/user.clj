@@ -1,14 +1,15 @@
 (ns user
-  (:refer-clojure :exclude [= not=])
+  (:refer-clojure :exclude [= not= read])
   (:require
    [clojure.core :as c]
-   [clojure.tools.namespace.repl :referc [refresh]]
+   [clojure.tools.namespace.repl :refer [refresh]]
    [lift.lang.analyze :as ana]
    [lift.lang.inference :refer [infer]]
    [lift.lang.interface :refer [interface impl]]
    [lift.lang.signatures :as sig]
    [lift.lang.type :as t :refer [id import-syntax-types import-type-types]]
-   [lift.lang.type.impl :as impl]))
+   [lift.lang.type.impl :as impl]
+   ))
 
 (import-syntax-types)
 (import-type-types)
@@ -20,11 +21,15 @@
    (=    [x y] (c/= x y))
    (not= [x y] (c/not= x y))))
 
-;; @t/type-env
-
 (impl (Eq Int)
   (=    [x y] (c/= x y))
   (not= [x y] (c/not= x y)))
+
+(interface (Read a)
+  (read (String -> a)))
+
+(impl (Read Int)
+  (read [s] (Integer. s)))
 
 ;; Eq
 
@@ -43,10 +48,20 @@
 ;;  )
 ;; (lift.lang/require [lib.a.thing :as a])
 ;; @lift.lang.type/type-env
+(defn check [expr]
+  (let [[s ast] (->> expr
+                     (impl/ana ana/parse)
+                     (infer @t/type-env))]
+    (t/substitute ast s)))
 
-(->> '(fn [a b] (= a b))
-     (impl/ana ana/parse)
-     (infer @lift.lang.type/type-env)
-     (second)
-     (:t)
-     )
+(check '(= 1 (read "1")))
+
+;; (t/substitute (SyntaxNode. (Var. 'a) (Var. 'a))
+;;               (t/sub {'a (Const. 'Int)}))
+
+;; (->> '(fn [a b] (= a b))
+;;      (impl/ana ana/parse)
+;;      (infer @lift.lang.type/type-env)
+;;      (second)
+;;      (:t)
+;;      )

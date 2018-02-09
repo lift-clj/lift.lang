@@ -135,7 +135,8 @@
 
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))
-  Show    (-show [_]   (str n (when t (str ":" (pr-str t))))))
+  Show    (-show [_]   (str n (when t (str ":" (pr-str t)))))
+  Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s))))
 
 (defmacro import-syntax-types []
   `(do (import ~@`[Literal Symbol Lambda Apply Let If SyntaxNode]) nil))

@@ -47,7 +47,6 @@
     [nil t]))
 
 (defn release? [_Gamma p]
-  (prn p)
   (or (nil? p)
       (contains? _Gamma p)
       (assume? p)
@@ -70,7 +69,6 @@
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
-    (prn ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
@@ -101,9 +99,6 @@
    (let [tv (Var. (gensym 'ξ))
          [s1 [_ t1 :as e1]] (e1 _Gamma)
          [s2 [_ t2 :as e2]] (e2 (t/substitute _Gamma s1))
-         _ (prn _Gamma)
-         _ (prn s1 s2)
-         _ (prn t1 t2)
          [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
      [(compose s3 s2 s1)
       ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))])))
