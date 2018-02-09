@@ -73,7 +73,7 @@
     (boolean
      (or (identical? ~'this ~'other)
          (when (identical? (class ~'this) (class ~'other))
-           (= ~args (seq ~'other)))))))
+           (= ~args (-vec ~'other)))))))
 
 (defn hasheq-impl [tag args]
   `(~'hasheq [~'_]

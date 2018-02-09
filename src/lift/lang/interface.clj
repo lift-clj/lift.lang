@@ -23,10 +23,7 @@
 
 (def interfaces (atom {}))
 
-(defn- add-interface! [type fn-list])
-(defn- add-impl! [type impl fn-list])
-
-(defn- get-impl [d vars f sig arglist]
+(defn get-impl [d vars f sig arglist]
   (let [path (->> arglist
                   (map (fn [s a]
                          (and (instance? Var s)
@@ -40,47 +37,34 @@
   {:style/indent :defn}
   [t & fn-list-defaults?]
   (let [[class v] t
-        constraints [(Predicate. class (Var. v))]
+        pred (Predicate. class (Var. v))
+        constraints [pred]
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
-       (def ~class (atom {}))
-       ~@(->> fns
-              (mapcat
-               (fn [[f {:keys [sig impl]}]]
-                 (let [{:keys [arglist args]} (sig/tuple-arglist sig)]
-                   `((defn ~f ~arglist
-                       (let [impl# (or (get-impl (deref ~class)
-                                                 '~(set (rest t))
-                                                 '~f
-                                                 '~sig
-                                                 ~(vec (remove #{'&} arglist)))
-                                       ~impl)]
-                         (apply impl# (apply concat ~args))))
-                     (swap! t/type-env assoc
-                            '~(u/resolve-sym f)
-                            ~(Forall. (t/ftv sig)
-                                      (Predicated. constraints sig))))))))
+       ~@(mapcat
+          (fn [[f {:keys [sig impl]}]]
+            (let [{:keys [arglist args]} (sig/arglist sig)]
+              `((defn ~f ~arglist
+                  (let [impl# (or (get-impl ~pred
+                                            '~(set (rest t))
+                                            '~f
+                                            ~sig
+                                            ~(vec (remove #{'&} arglist)))
+                                  ~impl)]
+                    (apply impl# (apply concat ~args))))
+                (swap! t/type-env assoc
+                       '~(u/resolve-sym f)
+                       (Forall. (t/ftv ~sig)
+                                (Predicated. ~constraints ~sig))))))
+          fns)
        '~t)))
 
 (defmacro impl {:style/indent :defn}
   [type & impls]
-  (let [dict (first type)
-        itype (sig/impl-type type)]
+  (let [pred (Predicate. (first type) (Const. (second type)))]
     `(do
-       (swap! ~dict merge ~(sig/impl (rest type) impls))
+       (swap! t/type-env assoc ~pred ~(sig/impl impls))
        '~type)))
-
-(interface (Eq a)
-  (=    ([a & a] -> Boolean))
-  (not= ([a & a] -> Boolean))
-  (default
-   (=    [x & xs] (apply c/= x xs))
-   (not= [x & xs] (apply c/not= x xs))))
-
-(impl (Eq Integer)
-  (=    [x & xs] (apply c/= x xs))
-  (not= [x & xs] (apply c/not= x xs)))
-
 
 ;; (interface (Show a)
 ;;   show (a -> String))

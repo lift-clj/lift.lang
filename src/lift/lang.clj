@@ -137,7 +137,7 @@
 (defn load-ns [ns-sym]
   (-load (-> ns-sym ns-file-path io/resource)))
 
-(load-ns 'user)
+;; (load-ns 'user)
 
 ;; (io/resource "lift/lang.clj")
 

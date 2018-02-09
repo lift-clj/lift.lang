@@ -1,32 +1,22 @@
 (ns lift.lang.analyze
-  (:refer-clojure :exclude [case type])
+  (:refer-clojure :exclude [type])
   (:require
    [clojure.core :as c]
    [clojure.spec.alpha :as s]
-   [lift.lang.type :refer :all]
+   [lift.lang.type :as t]
    [lift.lang.util :refer [resolve-sym]]
    [lift.f.functor :as f]
    [clojure.set :as set]
    [lift.lang.pattern :as p])
   (:import
-   [lift.lang.type Apply Arrow Const Container If Lambda Let
-    Literal Map Predicate Predicated Symbol Tuple Var Variadic Vector]))
+   [lift.lang.type.impl Type]))
 
-;; (extend-protocol f/Functor
-;;   ;; overriding the incorrect impl by lift.f.functor
-;;   )
-
-(defn cata [f x]
-  (f (f/map #(cata f %) x)))
-
-(defn ana [f x]
-  (f/map #(ana f %) (f x)))
-
-(defn hylo [f g x]
-  (f (f/map #(hylo f g %) (g x))))
+(t/import-container-types)
+(t/import-syntax-types)
+(t/import-type-types)
 
 (defn prim? [x]
-  (and (simple-symbol? x) (contains? @type-env x)))
+  (and (simple-symbol? x) (contains? @t/type-env x)))
 
 (defn class-name? [x]
   (and (simple-symbol? x) (not (prim? x)) (class? (resolve x))))
@@ -140,17 +130,24 @@
 (defmethod -parse :Var [_ expr]
   (Symbol. expr))
 
-(defmethod -parse :VFn [_ [_ & vfns]]
-  (Variadic.
-   (mapv (fn [[arglist expr]]
-           (Lambda. (Tuple. (map #(Symbol. %) arglist)) expr))
-         vfns)))
+;; (defmethod -parse :VFn [_ [_ & vfns]]
+;;   (Variadic.
+;;    (mapv (fn [[arglist expr]]
+;;            (Lambda. (Tuple. (map #(Symbol. %) arglist)) expr))
+;;          vfns)))
+
+(defn encode-args [strategy ctor args]
+  (case strategy
+    :curry (reduce (fn [a b] (ctor a b)) args)
+    :tuple (ctor (Tuple. (vec (butlast args))) (last args))))
 
 (defmethod -parse :Lam [_ [_ arglist expr]]
-  (Lambda. (Tuple. (map #(Symbol. %) arglist)) expr))
+  (encode-args :curry
+               #(Lambda. %2 %)
+               (cons expr (map #(Symbol. %) (reverse arglist)))))
 
 (defmethod -parse :App [_ [op & args]]
-  (Apply. op (Tuple. (vec args))))
+  (encode-args :curry #(Apply. % %2) (cons op args)))
 
 (defmethod -parse :Let [_ [_ bindings expr]]
   (->> bindings
@@ -177,12 +174,11 @@
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
     (if (s/invalid? conformed)
-      (if (record? expr)
+      (if (instance? Type expr)
         expr
-        (throw (Exception. (str "Invalid Syntax"
-                                (with-out-str (s/explain ::expr expr))))))
-      (let [x (-parse (first conformed) expr)]
-        (cond-> x (record? x) (assoc :expr expr))))))
+        (throw (ex-info (str "Invalid Syntax")
+                        (s/explain-data ::expr expr))))
+      (-parse (first conformed) expr))))
 
 ;; (->> '(fn
 ;;         ([a] [a])

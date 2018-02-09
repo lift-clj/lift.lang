@@ -1,11 +1,12 @@
 (ns lift.lang.signatures
   (:require
+   [clojure.core :as c]
+   [clojure.pprint :refer [pprint]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
+   [lift.lang.pattern :as p]
    [lift.lang.type :refer :all]
-   [lift.lang.util :as u]
-   [clojure.core :as c]
-   [lift.lang.pattern :as p]))
+   [lift.lang.util :as u]))
 
 (import-type-types)
 (import-container-types)
@@ -102,7 +103,7 @@
     (if (s/invalid? c)
       (throw
        (Exception. (str "Invalid interface signature\n"
-                        (with-out-str (clojure.pprint/pprint expr))
+                        (with-out-str (pprint expr))
                         \newline
                         (with-out-str (s/explain ::interface-fn-list-default expr)))))
       (reduce (fn [i {:keys [f arglist expr] :as x}]
@@ -126,16 +127,15 @@
 
   )
 
-(defn arglist [fn-sig]
-  (if (instance? Arrow fn-sig)
-    (merge-with into
-                (let [{{a :a :as in} :a} fn-sig
-                      gs (gensym)]
-                  (if (instance? Vargs in)
-                    {:arglist ['& gs] :args [gs]}
-                    {:arglist [gs]    :args [[gs]]}))
-                (arglist (:b fn-sig)))
-    []))
+(p/defn curried-arglist
+  ([[Arrow a b]]
+   (merge-with into
+               (let [gs (gensym)]
+                 (if (instance? Vargs a)
+                   {:arglist ['& gs] :args [gs]}
+                   {:arglist [gs]    :args [[gs]]}))
+               (curried-arglist b)))
+  ([_] []))
 
 (p/defn tuple-arglist
   ([[Arrow [Tuple xs]]]
@@ -147,6 +147,10 @@
         (apply merge-with into)))
   ([x] (throw (Exception. (format "Not a tupled function %s" (pr-str x))))))
 
+(defn arglist [t]
+  (or (try (tuple-arglist t) (catch Throwable _))
+      (curried-arglist t)))
+
 (comment
   (tuple-arglist
    (Arrow. (Tuple. [(Var. 'a) (Vargs. 'a)]) (Const. 'Bool))))
@@ -157,10 +161,10 @@
 
 (defn q1 [x] (list 'quote x))
 
-(defn impl [path impls]
+(defn impl [impls]
   (letfn [(f [{:keys [f arglist expr]}] `(fn ~f ~arglist ~expr))]
     (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
-      (assoc-in {} (map q1 path) (into {} (map (juxt (comp q1 :f) f) c))))))
+      (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c)))))
 
 (defn arrseq [f]
   (if (instance? Arrow f)

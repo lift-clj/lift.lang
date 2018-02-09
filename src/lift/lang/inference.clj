@@ -101,6 +101,9 @@
    (let [tv (Var. (gensym 'ξ))
          [s1 [_ t1 :as e1]] (e1 _Gamma)
          [s2 [_ t2 :as e2]] (e2 (t/substitute _Gamma s1))
+         _ (prn _Gamma)
+         _ (prn s1 s2)
+         _ (prn t1 t2)
          [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
      [(compose s3 s2 s1)
       ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))])))
@@ -108,13 +111,3 @@
 (defn infer [_Gamma expr]
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
-
-(->> (Lambda. (Symbol. 'a)
-              (Lambda. (Symbol. 'b)
-                       (-> (Symbol. '=)
-                           (Apply. (Symbol. 'a))
-                           (Apply. (Symbol. 'b)))))
-     (infer @lift.lang.type/type-env)
-     ;; (second)
-     ;; (:t)
-     )

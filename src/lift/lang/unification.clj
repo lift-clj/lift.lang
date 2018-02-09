@@ -8,6 +8,8 @@
    [lift.lang.type.impl :refer [cata]]
    [lift.lang.util :as u]))
 
+(import-type-types)
+
 (def id (t/sub {}))
 
 (defn occurs? [x expr]

@@ -1,22 +1,16 @@
 (ns lift.lang.type
   (:refer-clojure :exclude [case def])
   (:require
+   [clojure.core :as c]
    [clojure.core.protocols :refer [IKVReduce]]
+   [clojure.java.io :as io]
    [clojure.set :refer [difference union]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [lift.f.functor :as f :refer [Functor]]
    [lift.lang.type.impl :as impl :refer [cata Show]]
-   [lift.lang.util :refer :all]
-   [clojure.walk :as walk]
-   [clojure.java.io :as io]
-   [clojure.core :as c]
-   [clojure.string :as str])
-  (:import
-   [clojure.lang
-    IHashEq ILookup Indexed ISeq IPersistentMap IPersistentVector]))
-
-(alias 'c 'clojure.core)
+   [lift.lang.util :as u])
+  (:import [clojure.lang ILookup IPersistentMap]))
 
 (defprotocol Ftv (-ftv [x]))
 
@@ -63,7 +57,7 @@
 
 (impl/deftype (Forall as t)
   Ftv  (-ftv  [x]   (difference t as))
-  Show (-show [_]  (prn as t) (str (string/join " " (map #(str "∀" %) as)) \. t))
+  Show (-show [_]   (str (string/join " " (map #(str "∀" %) as)) \. t))
   Sub  (-sub  [_ s] (Forall. as (t (apply dissoc s as)))))
 
 (impl/deftype (Predicate tag a)
@@ -76,7 +70,6 @@
 
 (defmacro import-type-types []
   `(import ~@`[Unit Const Var Vargs Arrow Forall Predicate Predicated]))
-
 
 (impl/deftype (Container tag args)
   Ftv  (-ftv [_] (set (apply concat args)))
@@ -145,7 +138,7 @@
   Show    (-show [_]   (str n (when t (str ":" (pr-str t))))))
 
 (defmacro import-syntax-types []
-  `(import ~@`[Literal Symbol Lambda Apply Let If SyntaxNode]))
+  `(do (import ~@`[Literal Symbol Lambda Apply Let If SyntaxNode]) nil))
 
 (impl/deftype (Variadic vfns)
   Functor (-map [_ f] (Variadic. (f/-map vfns f)))
@@ -274,7 +267,7 @@
 (defmethod construct :type-name [[_ ast]]
   (let [env @type-env]
     (or (get env ast)
-        (let [sym (resolve-sym ast)
+        (let [sym (u/resolve-sym ast)
               t (Const. sym)]
           #_(or (when (contains? env sym) t)
                 (when (contains? env t) t))
@@ -290,7 +283,7 @@
   (->> (map :type (:more ast))
        (cons (:type ast))
        (map construct)
-       (curry #(Arrow. % %2))))
+       (u/curry #(Arrow. % %2))))
 
 (defmethod construct :product [[_ ast]]
   (let [{:keys [value-cons]} ast]
@@ -316,10 +309,10 @@
       (assoc :rec-cons (construct [:rec-cons (:rec-cons ast)]))))
 
 (defmethod construct :simple-type [[_ type-name]]
-  (Container. (resolve-sym type-name) nil))
+  (Container. (u/resolve-sym type-name) nil))
 
 (defmethod construct :parameterized [[_ [_ x]]]
-  (let [tag (resolve-sym (:type-name x))]
+  (let [tag (u/resolve-sym (:type-name x))]
     (let [args (map construct (:args x))]
       (Container. tag args))))
 
@@ -367,7 +360,7 @@
    (let [m (meta sig)]
      (cond
        (symbol? type)
-       `(let [type# '~(resolve-sym type)
+       `(let [type# '~(u/resolve-sym type)
               ts# (type-signature '~sig)]
           (swap! type-env assoc type# (with-meta (Scheme. ts# (ftv ts#)) ~m))
           type#)
