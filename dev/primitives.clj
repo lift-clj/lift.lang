@@ -9,5 +9,5 @@
 (defn =-Long->Long [^Long x ^Long y]
   (.equals x y))
 
-(t/def str->Long (String -> Int))
+(t/def str->Long (String -> Long))
 (defn str->Long [s] (Long. s))

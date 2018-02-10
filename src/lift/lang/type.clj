@@ -61,6 +61,7 @@
   Sub  (-sub  [_ s] (Forall. as (t (apply dissoc s as)))))
 
 (impl/deftype (Predicate tag a)
+  Ftv  (-ftv  [_] a)
   Show (-show [_] (format "%s %s" (name tag) a)))
 
 (impl/deftype (Predicated preds t)

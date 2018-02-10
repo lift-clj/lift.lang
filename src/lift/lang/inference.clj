@@ -108,7 +108,8 @@
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
 
-(defn check [expr]
-  (let [[s ast] ((hylo (fn [x] (fn [env] (-infer env x))) ana/parse expr)
-                 @t/type-env)]
-    (t/substitute ast s)))
+(defn check
+  ([expr] (check @t/type-env expr))
+  ([env expr]
+   (let [[s ast] ((hylo (fn [x] (fn [env] (-infer env x))) ana/parse expr) env)]
+     (t/substitute ast s))))

@@ -25,29 +25,32 @@
    (=    [x y] (c/= x y))
    (not= [x y] (c/not= x y))))
 
-(impl (Eq Int)
+(impl (Eq Long)
   (=    [x y] (prim/=-Long->Long x y))
   (not= [x y] (not (= x y))))
 
+;; (swap! t/type-env dissoc (Predicate. 'Eq (Const. 'Long)))
 (interface (Read a)
   (read (String -> a)))
 
-(impl (Read Int)
+(impl (Read Long)
   (read [s] (prim/str->Long s)))
 
 
-;; ;; ;; ;; c/eval
+;; ;; ;; ;; ;; c/eval
+;; ;; ;; ;; eval
 ;; ;; ;; eval
-;; ;; eval
-;; ;; emit
-eval
-(emit
- (impl/cata
-  (partial -rewrite @t/type-env)
-  (check '(= 1 (read "1")))))
+;; ;; ;; emit
+;; eval
+;; (emit
+;;  (impl/cata
+;;   (partial -rewrite @t/type-env)
+;;   (check '(= 1 (read "1")))))
 
+;; eval
+;; emit
 (eval
  (emit
   (impl/cata
    (partial -rewrite @t/type-env)
-   (check '((fn [x] (= x (read "2"))) 2)))))
+   (check '(= 2 (read "2"))))))

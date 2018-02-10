@@ -110,10 +110,10 @@
 
 (p/defn type
   ([[Literal a]]
-   (let [k (->> a (s/conform ::literal) first name symbol)]
-     ;; c/case k
-     ;; lift/Num (Predicated. [(Predicate. k (Var. 'a))] (Var. 'a))
-     (Const. k)))
+   ;; let [k (->> a (s/conform ::literal) first name symbol)]
+   ;; c/case k
+   ;; lift/Num (Predicated. [(Predicate. k (Var. 'a))] (Var. 'a))
+   (Const. (-> a c/type .getSimpleName symbol)))
   ([x]
    (throw
     (Exception. (str "Cannot parse type of non-Literal: " (pr-str x))))))

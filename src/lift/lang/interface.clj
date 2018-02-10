@@ -61,14 +61,18 @@
             `[~(default-impl f sig pred t impl)
               ~(type-sig-impl f sig pred)])
           fns)
+       (swap! t/type-env assoc '~class ~pred)
        '~t)))
 
 (defmacro impl {:style/indent :defn}
-  [type & impls]
-  (let [pred (Predicate. (first type) (Const. (second type)))]
+  [[tag a] & impls]
+  (let [const   (Const. a)
+        [_ [b]] (get @t/type-env tag)
+        pred    (Predicate. tag const)
+        sub     (t/sub {b const})]
     `(do
-       (swap! t/type-env assoc ~pred ~(sig/impl impls))
-       '~type)))
+       (swap! t/type-env assoc ~pred ~(sig/impl pred sub impls))
+       (list ~pred))))
 
 
 ;; (interface (Show a)

@@ -4,15 +4,17 @@
    [clojure.pprint :refer [pprint]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
-   [lift.lang.inference :refer [check]]
+   [lift.lang.inference :as infer :refer [check rel-unify]]
    [lift.lang.pattern :as p]
-   [lift.lang.type :refer :all]
+   [lift.lang.type :as t]
+   [lift.lang.unification :refer [unify]]
    [lift.lang.util :as u]
    [lift.lang.type.impl :as impl]
    [lift.lang.analyze :as ana]))
 
-(import-type-types)
-(import-container-types)
+(t/import-syntax-types)
+(t/import-type-types)
+(t/import-container-types)
 
 ;; a, b, c, etc.
 (s/def ::var
@@ -164,9 +166,16 @@
 
 (defn q1 [x] (list 'quote x))
 
-(defn impl [impls]
+(defn impl [pred sub impls]
   (letfn [(f [{:keys [f arglist expr]}]
-            (check (list 'fn arglist expr)))]
+            (let [f       (u/resolve-sym f)
+                  _Gamma       (assoc @t/type-env pred ::temp)
+                  [e t]   (check (list 'fn arglist expr))
+                  [as pt] (get _Gamma f)
+                  [ps t'] pt
+                  [s p]   (rel-unify _Gamma t (t/substitute t' sub))
+                  [_ t]   (infer/release t)]
+              (t/substitute (SyntaxNode. e t) s)))]
     (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
       (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c)))))
 

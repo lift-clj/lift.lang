@@ -21,7 +21,9 @@
        [Symbol f]
        [Predicated [[Predicate _ [Const _] :as p]] [Arrow :as t]]]]
    (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma))))
-  ([_ [SyntaxNode [Apply [Symbol :as e1] e2] [Arrow _]]]
+  ([_ [SyntaxNode [Apply [Lambda :as e1] e2] [Arrow _]]]
+   (Apply. e1 e2))
+  ([_ [SyntaxNode [Apply e1 e2] [Arrow _]]]
    (Apply. (Curry. e1) e2))
   ([_ [SyntaxNode x _]] x)
   ([_ [Curry f]] f)
