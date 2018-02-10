@@ -114,8 +114,9 @@
   `(defmethod print-method ~classname [~'x ~'w] (.write ~'w (show ~'x))))
 
 (defn functor-impl [tag args]
-  `(f/-map ~'[_ f] (new ~tag ~@(butlast args)
-                        ~@(if-let [l (last args)] [`(~'f ~l)] []))))
+  (let [f (gensym)]
+    `(f/-map [_# ~f] (new ~tag ~@(butlast args)
+                          ~@(if-let [l (last args)] [`(~f ~l)] [])))))
 
 (def default-ifaces
   '#{clojure.lang.IHashEq

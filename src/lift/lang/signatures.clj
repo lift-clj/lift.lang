@@ -4,9 +4,12 @@
    [clojure.pprint :refer [pprint]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
+   [lift.lang.inference :refer [check]]
    [lift.lang.pattern :as p]
    [lift.lang.type :refer :all]
-   [lift.lang.util :as u]))
+   [lift.lang.util :as u]
+   [lift.lang.type.impl :as impl]
+   [lift.lang.analyze :as ana]))
 
 (import-type-types)
 (import-container-types)
@@ -162,7 +165,8 @@
 (defn q1 [x] (list 'quote x))
 
 (defn impl [impls]
-  (letfn [(f [{:keys [f arglist expr]}] `(fn ~f ~arglist ~expr))]
+  (letfn [(f [{:keys [f arglist expr]}]
+            (check (list 'fn arglist expr)))]
     (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
       (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c)))))
 

@@ -8,16 +8,16 @@
     (or (some-> (get (ns-aliases *ns*) ns-sym) str (symbol (name s))) s)
     (symbol (str (.name *ns*)) (str s))))
 
+
 (defn ->sym [v]
   (if (class? v)
-    (throw (Exception. (format "Cannot turn class %s into symbol" v)))
+    (symbol (.getSimpleName v))
     (symbol (name (.getName (:ns (meta v))))
             (name (:name (meta v))))))
 
 (defn resolve-sym
   ([ns s]
-   (or (some-> s resolve ->sym)
-       (ns-qualify s)))
+   (or (some-> s resolve ->sym) (ns-qualify s)))
   ([s]
    (resolve-sym *ns* s)))
 

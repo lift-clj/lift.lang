@@ -33,29 +33,33 @@
                   (filterv identity))]
     (get-in d (into path [f]))))
 
+(defn default-impl [f sig pred t impl]
+  (let [{:keys [arglist args]} (sig/arglist sig)]
+    `(defn ~f ~arglist
+       (let [impl# (or (get-impl ~pred
+                                 '~(set (rest t))
+                                 '~f
+                                 ~sig
+                                 ~(vec (remove #{'&} arglist)))
+                       ~impl)]
+         (apply impl# (apply concat ~args))))))
+
+(defn type-sig-impl [f sig pred]
+  `(swap! t/type-env assoc
+          '~(u/resolve-sym f)
+          (Forall. (t/ftv ~sig) (Predicated. [~pred] ~sig))))
+
 (defmacro interface
   {:style/indent :defn}
   [t & fn-list-defaults?]
   (let [[class v] t
         pred (Predicate. class (Var. v))
-        constraints [pred]
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
        ~@(mapcat
           (fn [[f {:keys [sig impl]}]]
-            (let [{:keys [arglist args]} (sig/arglist sig)]
-              `((defn ~f ~arglist
-                  (let [impl# (or (get-impl ~pred
-                                            '~(set (rest t))
-                                            '~f
-                                            ~sig
-                                            ~(vec (remove #{'&} arglist)))
-                                  ~impl)]
-                    (apply impl# (apply concat ~args))))
-                (swap! t/type-env assoc
-                       '~(u/resolve-sym f)
-                       (Forall. (t/ftv ~sig)
-                                (Predicated. ~constraints ~sig))))))
+            `[~(default-impl f sig pred t impl)
+              ~(type-sig-impl f sig pred)])
           fns)
        '~t)))
 
@@ -65,6 +69,7 @@
     `(do
        (swap! t/type-env assoc ~pred ~(sig/impl impls))
        '~type)))
+
 
 ;; (interface (Show a)
 ;;   show (a -> String))

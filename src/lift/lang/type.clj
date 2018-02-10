@@ -69,7 +69,7 @@
   Show    (-show [_]   (str (string/join ", " preds) " => " t)))
 
 (defmacro import-type-types []
-  `(import ~@`[Unit Const Var Vargs Arrow Forall Predicate Predicated]))
+  `(do (import ~@`[Unit Const Var Vargs Arrow Forall Predicate Predicated]) nil))
 
 (impl/deftype (Container tag args)
   Ftv  (-ftv [_] (set (apply concat args)))
@@ -107,16 +107,16 @@
   Show    (-show [_]   (format "[%s]" (string/join " " xs))))
 
 (defmacro import-container-types []
-  `(import ~@`[Container RowEmpty Row Record Vector Map Tuple]))
+  `(do (import ~@`[Container RowEmpty Row Record Vector Map Tuple]) nil))
 
 
 (impl/deftype (Literal a)
   Functor (-map [x _] x)
-  Show    (-show [_] (str a)))
+  Show    (-show [_] (pr-str a)))
 
 (impl/deftype (Symbol a)
   Functor (-map [x _] x)
-  Show    (-show [_] (format "(Symbol %s)" (str a))))
+  Show    (-show [_] (name a)))
 
 (impl/deftype (Lambda x e)
   Show (-show [_] (format "(fn [%s] %s)" (impl/-show x) e)))
@@ -138,8 +138,11 @@
   Show    (-show [_]   (str n (when t (str ":" (pr-str t)))))
   Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s))))
 
+(impl/deftype (Curry f)
+  Show (-show [_] (format "(Curry %s)" f)))
+
 (defmacro import-syntax-types []
-  `(do (import ~@`[Literal Symbol Lambda Apply Let If SyntaxNode]) nil))
+  `(do (import ~@`[Literal Symbol Lambda Apply Let If SyntaxNode Curry]) nil))
 
 (impl/deftype (Variadic vfns)
   Functor (-map [_ f] (Variadic. (f/-map vfns f)))
@@ -355,21 +358,20 @@
 (defmacro def
   ([type]
    `(let [type# (type-signature '~type)]
-      (swap! type-env assoc type# (Scheme. type# (ftv type#)))
+      (swap! type-env assoc type# (Forall. (ftv type#) type#))
       type#))
   ([type sig]
-   (let [m (meta sig)]
-     (cond
-       (symbol? type)
-       `(let [type# '~(u/resolve-sym type)
-              ts# (type-signature '~sig)]
-          (swap! type-env assoc type# (with-meta (Scheme. ts# (ftv ts#)) ~m))
-          type#)
-       (keyword? type)
-       `(let [type# ~type
-              ts# (type-signature '~sig)]
-          (swap! type-env assoc type# (with-meta (Scheme. ts# (ftv ts#)) ~m))
-          type#)))))
+   (cond
+     (symbol? type)
+     `(let [type# '~(u/resolve-sym type)
+            ts# (type-signature '~sig)]
+        (swap! type-env assoc type# (Forall. (ftv ts#) ts#))
+        type#)
+     (keyword? type)
+     `(let [type# ~type
+            ts# (type-signature '~sig)]
+        (swap! type-env assoc type# (Forall. (ftv ts#) ts#))
+        type#))))
 
 (defmacro def-tuples []
   (let [fst (int \a)]

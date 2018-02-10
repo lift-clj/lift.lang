@@ -4,12 +4,16 @@
    [clojure.core :as c]
    [clojure.tools.namespace.repl :refer [refresh]]
    [lift.lang.analyze :as ana]
-   [lift.lang.inference :refer [infer]]
+   [lift.lang.inference :refer [check -infer infer]]
    [lift.lang.interface :refer [interface impl]]
+   [prelude :refer :all]
+   [primitives :as prim]
+   [lift.lang.rewrite :refer [-emit emit -rewrite rewrite]]
    [lift.lang.signatures :as sig]
    [lift.lang.type :as t :refer [id import-syntax-types import-type-types]]
    [lift.lang.type.impl :as impl]
    ))
+
 
 (import-syntax-types)
 (import-type-types)
@@ -22,46 +26,28 @@
    (not= [x y] (c/not= x y))))
 
 (impl (Eq Int)
-  (=    [x y] (c/= x y))
-  (not= [x y] (c/not= x y)))
+  (=    [x y] (prim/=-Long->Long x y))
+  (not= [x y] (not (= x y))))
 
 (interface (Read a)
   (read (String -> a)))
 
 (impl (Read Int)
-  (read [s] (Integer. s)))
+  (read [s] (prim/str->Long s)))
 
-;; Eq
 
-;; (->>
-;;  (Lambda. (Symbol. 'a)
-;;           (Lambda. (Symbol. 'b)
-;;                    (Lambda. (Symbol. 'c)
-;;                             (-> (Symbol. 'eq)
-;;                                 (Apply. (-> (Symbol. '+)
-;;                                             (Apply. (Symbol. 'b))
-;;                                             (Apply. (Symbol. 'c))))
-;;                                 (Apply. (Symbol. 'a))))))
-;;  (infer _Gamma)
-;;  (second)
-;;  (:t)
-;;  )
-;; (lift.lang/require [lib.a.thing :as a])
-;; @lift.lang.type/type-env
-(defn check [expr]
-  (let [[s ast] (->> expr
-                     (impl/ana ana/parse)
-                     (infer @t/type-env))]
-    (t/substitute ast s)))
+;; ;; ;; ;; c/eval
+;; ;; ;; eval
+;; ;; eval
+;; ;; emit
+eval
+(emit
+ (impl/cata
+  (partial -rewrite @t/type-env)
+  (check '(= 1 (read "1")))))
 
-(check '(= 1 (read "1")))
-
-;; (t/substitute (SyntaxNode. (Var. 'a) (Var. 'a))
-;;               (t/sub {'a (Const. 'Int)}))
-
-;; (->> '(fn [a b] (= a b))
-;;      (impl/ana ana/parse)
-;;      (infer @lift.lang.type/type-env)
-;;      (second)
-;;      (:t)
-;;      )
+(eval
+ (emit
+  (impl/cata
+   (partial -rewrite @t/type-env)
+   (check '((fn [x] (= x (read "2"))) 2)))))

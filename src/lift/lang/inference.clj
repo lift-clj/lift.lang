@@ -5,7 +5,7 @@
    [lift.lang.unification :refer [compose unify]]
    [lift.lang.util :as u]
    [lift.lang.type :as t :refer [id import-syntax-types import-type-types]]
-   [lift.lang.type.impl :refer [cata -vec]]
+   [lift.lang.type.impl :refer [cata hylo -vec]]
    [lift.lang.analyze :as ana]))
 
 (import-type-types)
@@ -28,8 +28,9 @@
 (defn xi? [x]
   (and (symbol? x) (= \ξ(first (name x)))))
 
-(defn assume? [p]
-  (xi? (.. p -a -a)))
+(p/defn assume?
+  ([[Predicate _ [Var a]]] (xi? a))
+  ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
 (defn lookup [_Gamma a]
   (or (get _Gamma a)
@@ -106,3 +107,8 @@
 (defn infer [_Gamma expr]
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
+
+(defn check [expr]
+  (let [[s ast] ((hylo (fn [x] (fn [env] (-infer env x))) ana/parse expr)
+                 @t/type-env)]
+    (t/substitute ast s)))

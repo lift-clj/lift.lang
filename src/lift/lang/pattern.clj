@@ -46,7 +46,7 @@
 (s/def ::destructuring
   (s/and vector?
          (s/cat :type (s/? ::type-name)
-                :args (s/+ ::pattern)
+                :args (s/* ::pattern)
                 :bind (s/? (s/cat :as #{:as} :binding symbol?)))))
 
 (s/def ::pattern
@@ -84,12 +84,15 @@
             type (:type mval)
             bind (:bind mval)
             dest (remove (comp #{:binding} first) args)
-            dsym (gensym)]
+            dsym (gensym)
+            vsym (gensym)]
       `(c/let [type?# (and ~type (instance? (ensure-class ~type) ~value))]
          (when (or type?# (nil? ~type))
-           (c/let [value# ~value
+           (c/let [~vsym ~value
                    ~@(when bind [(:binding bind) value])
-                   [~@(map arg-bindings args)] value#]
+                   ~@(c/let [ds (mapv arg-bindings args)]
+                       (when (seq (remove #{'_} ds))
+                         [ds vsym]))]
              ~(cond (some (comp #{:literal} first second) args)
                     `(when (literal= ~dsym '~args)
                        ~(if (seq dest)
@@ -102,7 +105,7 @@
                       (reduce (fn [expr d]
                                 (apply let-destructure (conj d guard expr)))
                               (if (some? guard)
-                                `(and ~guard ~expr)
+                                `(when ~guard ~expr)
                                 expr)
                               (reverse dest))
                       expr))))))
@@ -123,8 +126,16 @@
         (c/let [[match mval] (s/conform ::pattern bind)]
           (let-destructure match mval value nil expr))))))
 
+(defmacro nor
+  "Like or, but false is cool"
+  ([] nil)
+  ([x] x)
+  ([x & next]
+   `(let [or# ~x]
+      (if (some? or#) or# (nor ~@next)))))
+
 (defmacro case [e & bindings]
-  (cons 'or
+  (cons `nor
         (map (fn [[pattern expr]] `(let [~pattern ~e] ~expr))
              (partition 2 bindings))))
 
