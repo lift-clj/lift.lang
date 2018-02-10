@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [= not= read])
   (:require
    [clojure.core :as c]
+   [clojure.pprint :refer [pprint]]
    [clojure.tools.namespace.repl :refer [refresh]]
    [lift.lang.analyze :as ana]
    [lift.lang.inference :refer [check -infer infer]]
@@ -23,19 +24,27 @@
   (not= (a -> a -> Boolean))
   (default
    (=    [x y] (c/= x y))
-   (not= [x y] (c/not= x y))))
+   (not= [x y] (not (= x y)))))
 
 (impl (Eq Long)
-  (=    [x y] (prim/=-Long->Long x y))
+  (=    [x y] (prim/=Long x y))
   (not= [x y] (not (= x y))))
+
+(impl (Eq Character)
+  (=    [x y] (prim/=Character x y)))
+
+(defn print-type-env []
+  (pprint @t/type-env))
 
 ;; (swap! t/type-env dissoc (Predicate. 'Eq (Const. 'Long)))
 (interface (Read a)
   (read (String -> a)))
 
 (impl (Read Long)
-  (read [s] (prim/str->Long s)))
+  (read [s] (prim/readLong s)))
 
+(impl (Read Character)
+  (read [s] (prim/readCharacter s)))
 
 ;; ;; ;; ;; ;; c/eval
 ;; ;; ;; ;; eval
@@ -53,4 +62,4 @@
  (emit
   (impl/cata
    (partial -rewrite @t/type-env)
-   (check '(= 2 (read "2"))))))
+   (check '(not= \2 (read "\\2"))))))
