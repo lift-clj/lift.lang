@@ -19,8 +19,10 @@
 (p/defn -rewrite
   ([_Gamma [SyntaxNode
        [Symbol f]
-       [Predicated [[Predicate _ [Const _] :as p]] [Arrow :as t]]]]
-   (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma))))
+       [Predicated [[Predicate _ as :as p]] [Arrow :as t]] :as syn]]
+   (if (every? #(instance? Const %) as)
+     (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma)))
+     syn))
   ([_ [SyntaxNode [Apply [Lambda :as e1] e2] [Arrow _]]]
    (Apply. e1 e2))
   ([_ [SyntaxNode [Apply e1 e2] [Arrow _]]]

@@ -110,9 +110,6 @@
 
 (p/defn type
   ([[Literal a]]
-   ;; let [k (->> a (s/conform ::literal) first name symbol)]
-   ;; c/case k
-   ;; lift/Num (Predicated. [(Predicate. k (Var. 'a))] (Var. 'a))
    (Const. (-> a c/type .getSimpleName symbol)))
   ([x]
    (throw

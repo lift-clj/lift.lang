@@ -52,8 +52,8 @@
 (defmacro interface
   {:style/indent :defn}
   [t & fn-list-defaults?]
-  (let [[class v] t
-        pred (Predicate. class (Var. v))
+  (let [[class & as] t
+        pred (Predicate. class (mapv #(Var. %) as))
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
        ~@(mapcat
@@ -65,11 +65,11 @@
        '~t)))
 
 (defmacro impl {:style/indent :defn}
-  [[tag a] & impls]
-  (let [const   (Const. a)
-        [_ [b]] (get @t/type-env tag)
-        pred    (Predicate. tag const)
-        sub     (t/sub {b const})]
+  [[tag & as] & impls]
+  (let [consts (map #(Const. %) as)
+        [_ bs] (get @t/type-env tag)
+        pred   (Predicate. tag consts)
+        sub    (->> (map (fn [a [b]] [b a]) consts bs) (into {}) t/sub)]
     `(do
        (swap! t/type-env assoc ~pred ~(sig/impl pred sub impls))
        (list ~pred))))

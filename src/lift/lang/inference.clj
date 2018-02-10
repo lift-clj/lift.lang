@@ -11,25 +11,15 @@
 (import-type-types)
 (import-syntax-types)
 
-;; (def _Gamma
-;;   {'eq (Forall. #{'a}
-;;                 (Predicated. (list (Predicate. 'Eq (Var. 'a)))
-;;                              (Arrow. (Var. 'a)
-;;                                      (Arrow. (Var. 'a)
-;;                                              (Const. 'Bool)))))
-;;    '+ (Forall. #{'a}
-;;                (Predicated. (list (Predicate. 'Num (Var. 'a)))
-;;                             (Arrow. (Var. 'a)
-;;                                     (Arrow. (Var. 'a) (Var. 'a)))))
-;;    (Predicate. 'Eq (Const. 'Int)) ::static
-;;    (Predicate. 'Num (Const. 'Int)) ::static
-;;    })
-
 (defn xi? [x]
   (and (symbol? x) (= \ξ(first (name x)))))
 
 (p/defn assume?
-  ([[Predicate _ [Var a]]] (xi? a))
+  ([[Predicate _ as]]
+   (letfn [(can? [a]
+             (or (instance? Const a)
+                 (and (instance? Var a) (xi? (:a a)))))]
+     (every? can? as)))
   ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
 (defn lookup [_Gamma a]
@@ -59,8 +49,8 @@
         t)))
 
 (p/defn split-pred
-  ([[Predicate tag [Predicated [[Predicate _ a :as p]]]]]
-   [(Predicate. tag a) p])
+  ([[Predicate tag [Predicated [[Predicate _ as :as p]]]]]
+   [(Predicate. tag as) p])
   ([p] [p]))
 
 (defn rel-unify [_Gamma a b]

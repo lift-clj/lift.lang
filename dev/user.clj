@@ -16,6 +16,9 @@
    ))
 
 
+(defn print-type-env []
+  (pprint @t/type-env))
+
 (import-syntax-types)
 (import-type-types)
 
@@ -33,8 +36,6 @@
 (impl (Eq Character)
   (=    [x y] (prim/=Character x y)))
 
-(defn print-type-env []
-  (pprint @t/type-env))
 
 ;; (swap! t/type-env dissoc (Predicate. 'Eq (Const. 'Long)))
 (interface (Read a)
@@ -46,6 +47,14 @@
 (impl (Read Character)
   (read [s] (prim/readCharacter s)))
 
+(interface (Coercible a b)
+  (coerce (a -> b)))
+
+(impl (Coercible String Long)
+  (coerce [a] (read a)))
+
+(check '(= 1 (coerce "1")))
+
 ;; ;; ;; ;; ;; c/eval
 ;; ;; ;; ;; eval
 ;; ;; ;; eval
@@ -56,10 +65,10 @@
 ;;   (partial -rewrite @t/type-env)
 ;;   (check '(= 1 (read "1")))))
 
+;; ;; eval
+;; ;; emit
 ;; eval
 ;; emit
-(eval
- (emit
-  (impl/cata
-   (partial -rewrite @t/type-env)
-   (check '(not= \2 (read "\\2"))))))
+;; impl/cata
+;; (partial -rewrite @t/type-env)
+;; (check '(not= \2 (read "\\2")))

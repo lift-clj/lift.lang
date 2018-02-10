@@ -60,9 +60,9 @@
   Show (-show [_]   (str (string/join " " (map #(str "∀" %) as)) \. t))
   Sub  (-sub  [_ s] (Forall. as (t (apply dissoc s as)))))
 
-(impl/deftype (Predicate tag a)
-  Ftv  (-ftv  [_] a)
-  Show (-show [_] (format "%s %s" (name tag) a)))
+(impl/deftype (Predicate tag as)
+  Ftv  (-ftv  [_] (apply union as))
+  Show (-show [_] (format "%s %s" (name tag) (string/join " " as))))
 
 (impl/deftype (Predicated preds t)
   Functor (-map  [_ f] (Predicated. (map f preds) (f t)))
