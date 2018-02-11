@@ -3,11 +3,12 @@
   (:require
    [clojure.core :as c]
    [lift.lang.signatures :as sig]
-   [lift.lang.type :as t :refer [import-type-types]]
+   [lift.lang.type :as t]
+   [lift.lang.type.base :as base]
    [lift.lang.type.impl :as impl]
    [lift.lang.util :as u]))
 
-(import-type-types)
+(base/import-type-types)
 ;; requirements of interfaces:
 ;; type syntax parser & ast
 ;; pattern matching for impl?
@@ -49,13 +50,14 @@
           '~(u/resolve-sym f)
           (Forall. (t/ftv ~sig) (Predicated. [~pred] ~sig))))
 
-(defmacro interface
+(defn interface
   {:style/indent :defn}
-  [t & fn-list-defaults?]
+  [t fn-list-defaults?]
   (let [[class & as] t
         pred (Predicate. class (mapv #(Var. %) as))
         fns (sig/parse-fn-list-default fn-list-defaults?)]
     `(do
+       ~@(map (fn [[f _]] `(declare ~f)) fns)
        ~@(mapcat
           (fn [[f {:keys [sig impl]}]]
             `[~(default-impl f sig pred t impl)
@@ -64,8 +66,8 @@
        (swap! t/type-env assoc '~class ~pred)
        '~t)))
 
-(defmacro impl {:style/indent :defn}
-  [[tag & as] & impls]
+(defn impl {:style/indent :defn}
+  [[tag & as] impls]
   (let [consts (map #(Const. %) as)
         [_ bs] (get @t/type-env tag)
         pred   (Predicate. tag consts)

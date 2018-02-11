@@ -2,24 +2,25 @@
   (:refer-clojure :exclude [type])
   (:require
    [clojure.core :as c]
-   [clojure.spec.alpha :as s]
-   [lift.lang.type :as t]
-   [lift.lang.util :refer [resolve-sym]]
-   [lift.f.functor :as f]
    [clojure.set :as set]
-   [lift.lang.pattern :as p])
+   [clojure.spec.alpha :as s]
+   [lift.f.functor :as f]
+   [lift.lang.pattern :as p]
+   [lift.lang.type :as t]
+   [lift.lang.type.base :as base]
+   [lift.lang.util :refer [resolve-sym]])
   (:import
    [lift.lang.type.impl Type]))
 
-(t/import-container-types)
-(t/import-syntax-types)
-(t/import-type-types)
+(base/import-container-types)
+(base/import-syntax-types)
+(base/import-type-types)
 
 (defn prim? [x]
   (and (simple-symbol? x) (contains? @t/type-env x)))
 
 (defn class-name? [x]
-  (and (simple-symbol? x) (not (prim? x)) (class? (resolve x))))
+  (and (symbol? x) (not (prim? x)) (class? (resolve x))))
 
 (s/def ::literal
   (s/or :Boolean  boolean?
@@ -28,7 +29,7 @@
         :Float    float?
         ;; :Num      (s/or :i integer? :d double? :f float?)
         :String   string?
-        :Class    class-name?
+        :Class    class?
         :Symbol   symbol?
         :Keyword  keyword?
         :Char     char?))
@@ -65,7 +66,7 @@
 
 (s/def ::let
   (s/and seq?
-         (s/cat :let  #{'let}
+         (s/cat :let  #{'let 'let*}
                 :bind (s/and vector? (s/+ (s/cat :var ::var :expr any?)))
                 :expr any?)))
 
@@ -168,12 +169,14 @@
 (defmethod -parse :Res [_ [op r l]]
   (Apply. op [r l]))
 
+(defmethod -parse :Fun [_ f] f)
+
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
     (if (s/invalid? conformed)
       (if (instance? Type expr)
         expr
-        (throw (ex-info (str "Invalid Syntax")
+        (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
                         (s/explain-data ::expr expr))))
       (-parse (first conformed) expr))))
 

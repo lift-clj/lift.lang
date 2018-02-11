@@ -4,11 +4,13 @@
    [lift.f.functor :as f]
    [lift.lang.analyze :as ana]
    [lift.lang.pattern :as p]
-   [lift.lang.type :as t :refer [import-type-types]]
+   [lift.lang.type :as t]
+   [lift.lang.type.base :as base]
    [lift.lang.type.impl :refer [cata]]
    [lift.lang.util :as u]))
 
-(import-type-types)
+(base/import-container-types)
+(base/import-type-types)
 
 (def id (t/sub {}))
 
@@ -44,6 +46,15 @@
         s2 (unify (t/substitute r s1) (t/substitute r' s1))]
     (compose s2 s1)))
 
+(defn unify-compound [t1 tag1 t1-args t2 tag2 t2-args]
+  (if (= tag1 tag2)
+    (if (= (count t1-args) (count t2-args))
+      (->> (map vector t1-args t2-args)
+           (reduce (fn [s [t1 t2]] (compose (trampoline unify t1 t2) s))
+                   id))
+      (u/arity-error t1 t2))
+    (u/unification-failure t1 t2)))
+
 (p/defn unify
   ([[Arrow l r :as t1] [Arrow l' r' :as t2]] (unify-arrow l l' r r'))
 
@@ -51,5 +62,8 @@
   ([t [Var a]] (bind a t))
 
   ([[Const a] [Const b] | (= a b)] id)
+
+  ([[Container tag1 t1-args :as t1] [Container tag2 t2-args :as t2]]
+   (unify-compound t1 tag1 t1-args t2 tag2 t2-args))
 
   ([t1 t2] (u/unification-failure t1 t2)))

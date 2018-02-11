@@ -164,6 +164,6 @@
   (let [cls (base-classname tag)]
     (list 'do
           (deftype-expr tag (vec args) impls)
-          (prn-impl cls)
           (list 'import cls)
+          (prn-impl cls)
           (list 'quote (qualify-sym tag)))))

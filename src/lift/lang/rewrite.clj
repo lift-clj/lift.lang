@@ -3,13 +3,15 @@
    [lift.f.functor :as f]
    [lift.lang.inference :refer [infer]]
    [lift.lang.pattern :as p]
-   [lift.lang.type :as t]
+   [lift.lang.type.base :as base]
    [lift.lang.util :as u]
    [lift.lang.type.impl :as impl]
-   [lift.lang.analyze :as ana]))
+   [lift.lang.analyze :as ana])
+  (:import
+   [clojure.lang Fn]))
 
-(t/import-syntax-types)
-(t/import-type-types)
+(base/import-syntax-types)
+(base/import-type-types)
 
 (declare rewrite)
 
@@ -44,6 +46,9 @@
   ([[Symbol a]] a)
   ([[Lambda [Symbol x] e]] `(fn* [~x] ~e))
   ([[Apply e1 e2]] (list e1 e2))
+  ([[Let x e1 e2]] (list 'let [x e1] e2))
+  ([[If cond then else]] (list 'if cond then else))
+  ([[Prim f]] f)
   ([[Curry f]] `(fn* [x#] (partial ~f x#)))
   ([expr]
    (throw

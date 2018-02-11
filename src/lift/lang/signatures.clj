@@ -4,17 +4,18 @@
    [clojure.pprint :refer [pprint]]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
+   [lift.lang.analyze :as ana]
    [lift.lang.inference :as infer :refer [check rel-unify]]
    [lift.lang.pattern :as p]
    [lift.lang.type :as t]
-   [lift.lang.unification :refer [unify]]
-   [lift.lang.util :as u]
+   [lift.lang.type.base :as base]
    [lift.lang.type.impl :as impl]
-   [lift.lang.analyze :as ana]))
+   [lift.lang.unification :refer [unify]]
+   [lift.lang.util :as u]))
 
-(t/import-syntax-types)
-(t/import-type-types)
-(t/import-container-types)
+(base/import-syntax-types)
+(base/import-type-types)
+(base/import-container-types)
 
 ;; a, b, c, etc.
 (s/def ::var
@@ -172,7 +173,9 @@
                   _Gamma       (assoc @t/type-env pred ::temp)
                   [e t]   (check (list 'fn arglist expr))
                   [as pt] (get _Gamma f)
+                  _ (assert pt (format "Symbol %s not found in env" f))
                   [ps t'] pt
+                  _ (assert t')
                   [s p]   (rel-unify _Gamma t (t/substitute t' sub))
                   [_ t]   (infer/release t)]
               (t/substitute (SyntaxNode. e t) s)))]

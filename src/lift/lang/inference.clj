@@ -4,12 +4,16 @@
    [lift.lang.pattern :as p]
    [lift.lang.unification :refer [compose unify]]
    [lift.lang.util :as u]
-   [lift.lang.type :as t :refer [id import-syntax-types import-type-types]]
+   [lift.lang.type :as t :refer [id]]
+   [lift.lang.type.base :as base]
    [lift.lang.type.impl :refer [cata hylo -vec]]
-   [lift.lang.analyze :as ana]))
+   [lift.lang.analyze :as ana]
+   [clojure.set :as set])
+  (:import
+   [clojure.lang Fn]))
 
-(import-type-types)
-(import-syntax-types)
+(base/import-type-types)
+(base/import-syntax-types)
 
 (defn xi? [x]
   (and (symbol? x) (= \ξ(first (name x)))))
@@ -31,6 +35,9 @@
   (let [vars  (map (comp #(Var. %) gensym) as)
         subst (t/sub (zipmap as vars))]
     (t/substitute t subst)))
+
+(defn generalize [env t]
+  (Forall. (set/difference (t/ftv t) (t/ftv env)) t))
 
 (defn release [t]
   (if (instance? Predicated t)
@@ -92,7 +99,27 @@
          [s2 [_ t2 :as e2]] (e2 (t/substitute _Gamma s1))
          [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
      [(compose s3 s2 s1)
-      ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))])))
+      ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))]))
+
+  ([_Gamma [Let [x] e1 e2]]
+   (let [[s1 [_ t1 :as e1]] (e1 _Gamma)
+         _Gamma (-> _Gamma (t/substitute s1) (assoc x (generalize _Gamma t1)))
+         [s2 [_ t2 :as e2]] (e2 _Gamma)]
+      [(compose s2 s1)
+       ($ (Let. x e1 e2) t2)]))
+
+  ([_Gamma [If cond then else]]
+    (let [[s1 [_ t1 :as cond]] (cond _Gamma)
+          [s2 [_ t2 :as then]] (then _Gamma)
+          [s3 [_ t3 :as else]] (else _Gamma)
+          s4 (unify t1 (Const. 'Boolean))
+          s5 (unify t2 t3)]
+      [(compose s5 s4 s3 s2 s1) ($ (If. cond then else) (t/substitute t2 s5))]))
+
+  ([_Gamma [Prim :as p]] [id p])
+
+  ([_ x]
+   (throw (Exception. (str "Unrecognized syntax: " (pr-str x))))))
 
 (defn infer [_Gamma expr]
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
