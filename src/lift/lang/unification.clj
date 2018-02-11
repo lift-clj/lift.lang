@@ -22,7 +22,7 @@
 (defn unify-merge [a b]
   (reduce-kv (fn [init k v]
                (if-let [v' (k init)]
-                 (let [s (unify v' v)]
+                 (let [[s] (unify v' v)]
                    (-> init
                        (assoc k (t/substitute v' s))
                        (merge s)))

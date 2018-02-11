@@ -105,8 +105,7 @@
    (let [[s1 [_ t1 :as e1]] (e1 _Gamma)
          _Gamma (-> _Gamma (t/substitute s1) (assoc x (generalize _Gamma t1)))
          [s2 [_ t2 :as e2]] (e2 _Gamma)]
-      [(compose s2 s1)
-       ($ (Let. x e1 e2) t2)]))
+      [(compose s2 s1) ($ (Let. x e1 e2) t2)]))
 
   ([_Gamma [If cond then else]]
     (let [[s1 [_ t1 :as cond]] (cond _Gamma)

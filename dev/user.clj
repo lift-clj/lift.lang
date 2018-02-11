@@ -24,13 +24,28 @@
 (base/import-syntax-types)
 (base/import-type-types)
 
+(comment
+  (c/= 1
+       (eval
+        (emit
+         (impl/cata
+          (partial -rewrite @t/type-env)
+          (check (walk/macroexpand-all '(case (Just 1) [Just x] x Nothing 0)))))))
 
+  )
 
-(eval
- (emit
-  (impl/cata
-   (partial -rewrite @t/type-env)
-   (check (walk/macroexpand-all '(case Nothing [Just x] x Nothing 0))))))
+(comment
+
+  (c/= "a"
+      (eval
+       (emit
+        (impl/cata
+         (partial -rewrite @t/type-env)
+         (check (walk/macroexpand-all '(case (Right "a")
+                                         [Left a] a
+                                         [Right b] b)))))))
+
+  )
 
 ;; (-> #'Just meta :prj)
 ;; (t/new PhoneNumber = PhoneNumber String)

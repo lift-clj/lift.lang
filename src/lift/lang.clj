@@ -26,6 +26,7 @@
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)
+(data Either a b = Left a | Right b)
 
 (type/def not (Boolean -> Boolean))
 (type/def instance? (Class -> a -> Boolean))
