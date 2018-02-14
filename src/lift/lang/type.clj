@@ -63,10 +63,15 @@
 (defn case-form [x & [pattern expr & more]]
   (if (vector? pattern)
     (let [[c & as] pattern
-          {{:keys [isa? fs]} :prj} (-> c resolve meta)]
+          {{:keys [isa? fs]} :prj} (-> c resolve meta)
+          gsyms (map (fn [_] (gensym)) as)]
       `(if (~@isa? ~x)
-         (let* [~@(mapcat  (fn [a p] [a `(~p ~x)]) as fs)]
-           ~expr)
+         (let* [~@(mapcat (fn [a g p] [(if (symbol? a) a g) `(~p ~x)])
+                          as gsyms fs)]
+           ~(reduce (fn [expr [s a]]
+                      (if (vector? a) (case-form s a expr) expr))
+                    expr
+                    (reverse (map vector gsyms as))))
          ~(if (seq more)
             (apply case-form x more)
             `(t/unmatched-case-error ~x))))

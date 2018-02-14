@@ -82,6 +82,11 @@
 (s/def ::default-impl
   (s/and seq? (s/cat :f symbol? :arglist vector? :expr any?)))
 
+(s/def ::match-impl
+  (s/and seq?
+         (s/cat :f symbol?
+                :impls (s/+ (s/and seq? (s/cat :arglist vector? :expr any?))))))
+
 (s/def ::interface-fn-list-default
   (s/cat :fn-list (s/+ ::signature)
          :default (s/? (s/and seq? (s/cat :default #{'default}
@@ -167,6 +172,35 @@
 
 (defn q1 [x] (list 'quote x))
 
+(defmulti impl-fn (fn [[impl-type]] impl-type))
+
+;; {:f =,
+;;  :impls
+;;  [{:arglist [[Just x] [Just y]], :expr (= x y)}
+;;   {:arglist [Nothing Nothing], :expr True}
+;;   {:arglist [_ _], :expr False}]}
+
+(defn impls-arglist [[{:keys [arglist]} :as impls]]
+  (assert (reduce = (map (comp count :arglist) impls)))
+  (let [args (mapv (fn [& _] (gensym)) arglist)]
+    `(fn ~args
+       (t/case )
+       )
+    )
+  )
+
+;; (t/case (Just 1)
+;;   [Just x] x
+;;   Nothing 0)
+
+;; (defmethod impl-fn :match-impl [[_ {:keys [f impls]}]]
+;;   (let [f       (u/resolve-sym f)
+;;         _Gamma       (assoc @t/type-env pred ::temp)
+;;         [e t]   (check (list 'fn arglist expr))
+;;         [as pt] (get _Gamma f)
+;;         ])
+;;   )
+
 (defn impl [pred sub impls]
   (letfn [(f [{:keys [f arglist expr]}]
             (let [f       (u/resolve-sym f)
@@ -181,6 +215,13 @@
               (t/substitute (SyntaxNode. e t) s)))]
     (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
       (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c)))))
+
+(s/conform
+ ::match-impl
+ '(=
+   ([[Just x] [Just y]] (= x y))
+   ([Nothing   Nothing] True)
+   ([_         _      ] False)))
 
 (defn arrseq [f]
   (if (instance? Arrow f)

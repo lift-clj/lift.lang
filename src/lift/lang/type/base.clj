@@ -6,7 +6,7 @@
    [lift.f.functor :as f :refer [Functor]]
    [lift.lang.type.impl :as impl :refer [cata Show]])
   (:import
-   [clojure.lang ILookup IPersistentMap]))
+   [clojure.lang IFn ILookup IPersistentMap]))
 
 (defprotocol Ftv (-ftv [x]))
 
@@ -125,7 +125,8 @@
   Functor (-map [_ f] (If. (f cond) (f then) (f else))))
 
 (impl/deftype (Prim f t)
-  Functor (-map [x _] x))
+  Functor (-map [x _] x)
+  IFn     (invoke [_ x] (f x)))
 
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))

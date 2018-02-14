@@ -164,7 +164,6 @@
 
 (defn type-signature [sig]
   (let [spec (if (and (seq? sig) (= (count sig) 1)) ::retype ::type)]
-    (prn (u/assert-conform spec sig))
     (construct (u/assert-conform spec sig))))
 
 (defmacro prim [t]
