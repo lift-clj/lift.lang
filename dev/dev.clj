@@ -289,189 +289,158 @@
                                                      :expr [a b c]}}}}}}}})
 
 (declare case-tree)
+
+(defn project [n m e k]
+
+  )
 (defn ctor-proj [tree expr p gs]
   (fn [k]
     (assoc (case-tree nil tree expr k)
            ;; :prjx p
            :gsym gs)))
 
+(defn ctor-pattern [pattern gsyms prjs expr k]
+  (let [then (reverse (map #(ctor-proj % expr %2 %3) pattern prjs gsyms))]
+    (reduce (fn [x f] (f x)) ((first then) k) (rest then))))
+
 (defn ctor-dest [[type & pattern] expr k]
   (let [{:keys [isa? fs]} (-> type resolve meta :prj)
-        prjs (mapv gsym fs)
-        then (reverse (map #(ctor-proj % expr %2 %3) pattern fs prjs))]
-    ;; (prn type gs prjs)
+        gsyms (mapv gsym fs)]
     {:type :dest
      :test type
      ;; :isa? isa?
-     :prjs prjs
-     :then (reduce (fn [x f] (f x)) ((first then) k) (rest then))}))
+     :prjs gsyms
+     :then (ctor-pattern pattern gsyms fs expr k)}))
 
 (defn ctor-bind [a expr k]
+  (prn 'ctor-bind k (and k (k a)))
   (let [node {:type :bind :bind [a]}]
     (if k
-      (assoc node :then k)
+      (assoc node :then (k a))
       (assoc node :expr expr))))
 
 (defn ctor-litr [& args])
 
-(defn merge-pattern [a pattern expr k]
-  (here be the next step)
-  )
+(defn ctor-pattern [pattern gsyms prjs expr k]
+  (let [then (reverse (map #(ctor-proj % expr %2 %3) pattern prjs gsyms))]
+    (reduce (fn [x f] (f x)) ((first then) k) (rest then))))
 
-(defn merge-dest [{:keys [test] :as a} [type & pattern :as match] expr k]
+(defn merge-proj [a tree expr gs]
+  (fn [k]
+    (-> (case-tree a tree expr k)
+        (assoc :gsym gs))))
+
+;; k : tree -> node
+
+(defn merge-pattern [a pattern gsyms expr k]
+  (prn 'merge-pattern)
+  (prn a)
+  (prn pattern)
+  (let [then (reverse (map vector pattern gsyms))
+        f (fn [k [prj gs]]
+            (fn [tree]
+              (-> (case-tree tree prj expr k)
+                  (assoc :gsym gs))))
+        f' (reduce f (f k (first then)) (rest then))]
+    (f' a)))
+
+(defn merge-dest [{:keys [test prjs] :as a} [type & pattern :as match] expr k]
+  (prn 'merge-dest test type pattern)
   (if (= test type)
-    (update a :then merge-pattern pattern expr k)
+    (update a :then merge-pattern pattern prjs expr k)
     (update a :else case-tree match expr k)))
 
-(defn case-tree [{ta :type :as a} match expr k]
-  (cond (nil? ta)
-        (cond (vector? match)
-              (ctor-dest match expr k)
-              (var? match)
-              (ctor-bind match expr k)
-              :literal
-              (ctor-litr match expr k))
-        (= :dest ta)
-        (cond (vector? match)
-              (merge-dest a match expr k)
-              (var? match)
-              (if-not (:else a)
-                (update a :else ctor-bind match expr k)
-                (throw (Exception. "Trying to bind twice"))))
-        (= :bind ta)
-        (cond (vector? match)
-              (throw
-               (Exception. "Trying to match pattern after irrefutable bind"))
-              (var? match)
-              (throw
-               (Exception. "Trying to bind twice")))))
 
-(def case-1
-  '[Pair [Pair [Just a] [Just b]] c])
+(defn bind [n m e l]
+  (if n
+    (if l
+      (-> (update n :bind conj m) (update :then l))
+      (throw (Exception. "Trying to make final binding twice")))
+    (if l
+      {:type :bind :bind [m] :then (l nil)}
+      {:type :bind :bind [m] :expr e})))
 
-(def case-2
-  '[Pair [Pair a [Just b]] c])
+(defn dest [n m e l]
+  (let [[p & ms] m
+        prjs (map (juxt gsym identity) ms)
+        sjrp (reverse prjs)
+        l-fn (fn [l [gs m]]
+               (fn [n]
+                 (case-tree n m e l)))
+        l'   (reduce l-fn (l-fn l (first sjrp)) (rest sjrp))]
+    (if n
+      (if (= p (:test n))
+        (update n :then l')
+        (update n :else l' ))
+      {:type :dest
+       :test p
+       :prjs (mapv first prjs)
+       :then (l' nil)})))
 
-(clojure.pprint/pprint
- (-> (case-tree nil case-1 '[a b c] nil)
-     (case-tree case-2 '[a b c] nil)
-     ))
+(defn lit-eq [n m e l]
+  (if n
+    (if (= m (:ltrl n))
+      (update n :then l)
+      (update n :else l))
+    (if l
+      {:type :ltrl :ltrl m :then (l nil)}
+      {:type :ltrl :ltrl m :expr e})))
 
-(def branch-2
-  '{:type :dest
-    :test Pair
-    :then {:type :dest
-           :test Pair
-           :then {:type :bind
-                  :bind [d]
-                  :then {:type :dest
-                         :test Just
-                         :then {:type :bind
-                                :bind [e]
-                                :then {:type :bind
-                                       :bind [f]
-                                       :then {:type :expr
-                                              :expr [d e f]}}}}}}})
+(defn case-tree [n m e l]
+  (let [t (:type n)]
+    (cond (and (vector? m) (or (nil? n) (= t :dest)))
+          (dest n m e l)
+          (vector? m)
+          (throw (Exception. "Trying to match pattern after irrefutable bind"))
+          (and (var? m) (or (nil? n) (= t :bind)))
+          (bind n m e l)
+          (var? m)
+          (update n :else case-tree m e l)
+          (or (nil? n) (= t :ltrl))
+          (lit-eq n m e l)
+          :else
+          (update n :else case-tree m e l))))
 
-(declare merge-branches)
+(-> nil
+    (case-tree '[Pair [Pair [Just a] [Just b]] c] '[a b c] nil)
+    (case-tree '[Pair [Pair       a  [Just b]] c] '[a b c] nil)
+    (case-tree '[Pair [Pair       a        b ] c] '[a b c] nil)
+    (case-tree '[Pair             a        b    ] '[a b  ] nil)
+    (case-tree 'Nothing                           '[     ] nil)
+    (case-tree '_                                 '[     ] nil))
 
-(defn merge-dest [a b]
-  (if (= (:test a) (:test b))
-    (update a :then merge-branches (:then b))
-    (update a :else merge-branches b)))
-
-(defn merge-bind [a b]
-  (if (= (:bind a) (:bind b))
-    (update a :then merge-branches (:then b))
-    (-> a
-        (update :bind conj (:bind b))
-        (update :then merge-branches (:then b)))))
-
-(defn merge-branches [{:keys [type] :as a} b]
-  (prn a)
-  (prn b)
-  (if (= type (:type b))
-    (case type
-      :dest (merge-dest a b)
-      :bind (merge-bind a b)
-      :expr (throw (Exception. "Expr should be resolved before now")))
-    (if b
-      (update a :else merge-branches b)
-      a)))
-
-;; (merge-branches branch-1 branch-2)
-
-
-;; (let [a '(Pair 1)]
-;;   (compile-case a
-;;                 '[Pair {[[Pair [Just a] [Just b]] c] [abc]
-;;                         [a b] [a b]}]
-;;                 '[a b c]
-;;                 (fn else [f]
-;;                   (compile-case a
-;;                                 (fn else-2 [_]
-;;                                   `(t/unmatched-case-error ~a))))))
-
-;; (if (clojure.core/instance? lift.lang.__private.Pair (Pair 1))
-;;   (let* [G__18182 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a))) (Pair 1))
-;;          G__18183 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b))) (Pair 1))]
-;;     (if (clojure.core/instance? lift.lang.__private.Pair G__18182)
-;;       (let* [G__18184 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a))) G__18182)
-;;              G__18185 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b))) G__18182)]
-;;         (if (clojure.core/instance? lift.lang.__private.Just G__18184)
-;;           (let* [G__18189 ((Prim (clojure.core/fn -prj-Just [x] (clojure.core/nth x 0)) ((Maybe (Var a)) -> (Var a))) G__18184)]
-;;             (let* [a G__18189]
-;;               (if (clojure.core/instance? lift.lang.__private.Just G__18185)
-;;                 (let* [G__18186 ((Prim (clojure.core/fn -prj-Just [x] (clojure.core/nth x 0)) ((Maybe (Var a)) -> (Var a))) G__18185)]
-;;                   (let* [b G__18186]
-;;                     (let* [c G__18183] [a b c])))
-;;                 (if (clojure.core/instance? lift.lang.__private.Pair (Pair 1))
-;;                   (let* [G__18187 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a))) (Pair 1))
-;;                          G__18188 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b))) (Pair 1))]
-;;                     (let* [a G__18187]
-;;                       (let* [b G__18188] [a b])))
-;;                   (lift.lang.type/unmatched-case-error (Pair 1))))))
-;;           (if (clojure.core/instance? lift.lang.__private.Pair (Pair 1))
-;;             (let* [G__18190 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a))) (Pair 1))
-;;                    G__18191 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b))) (Pair 1))]
-;;               (let* [a G__18190]
-;;                 (let* [b G__18191] [a b])))
-;;             (lift.lang.type/unmatched-case-error (Pair 1)))))
-;;       (if (clojure.core/instance? lift.lang.__private.Pair (Pair 1))
-;;         (let* [G__18192 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a))) (Pair 1))
-;;                G__18193 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b))) (Pair 1))]
-;;           (let* [a G__18192]
-;;             (let* [b G__18193] [a b])))
-;;         (lift.lang.type/unmatched-case-error (Pair 1)))))
-;;   (if (clojure.core/instance? lift.lang.__private.Pair (Pair 1))
-;;     (let* [G__18194 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a))) (Pair 1))
-;;            G__18195 ((Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b))) (Pair 1))]
-;;       (let* [a G__18194]
-;;         (let* [b G__18195] [a b])))
-;;     (lift.lang.type/unmatched-case-error (Pair 1))))
-
-
-
-;; [{:type :test,
-;;   Pair
-;;   {:type :project,
-;;    :prjs
-;;    [G__29600
-;;     {:type :binding, :bind jc}
-;;     G__29599
-;;     {:type :test,
-;;      Pair
-;;      {:type :project,
-;;       :prjs
-;;       [G__29602
-;;        {:type :test,
-;;         Just
-;;         {:type :project,
-;;          :prjs [G__29604 {:type :binding, :bind b}],
-;;          :next {:type :binding, :bind G__29600}}}
-;;        G__29601
-;;        {:type :test,
-;;         Just
-;;         {:type :project,
-;;          :prjs [G__29603 {:type :binding, :bind a}],
-;;          :next {:type :binding, :bind G__29602}}}]}}]}}]
+{:type :dest,
+ :test Pair,
+ :prjs [_40 _41],
+ :then {:type :dest,
+        :test Pair,
+        :prjs [_42 _43],
+        :then {:type :dest,
+               :test Just,
+               :prjs [_44],
+               :then {:type :bind,
+                      :bind [a],
+                      :then {:type :dest,
+                             :test Just,
+                             :prjs [_45],
+                             :then {:type :bind,
+                                    :bind [b],
+                                    :then {:type :bind, :bind [c], :expr [a b c]}}}},
+               :else {:type :bind,
+                      :bind [a a],
+                      :then {:type :dest,
+                             :test Just,
+                             :prjs [_50],
+                             :then {:type :bind,
+                                    :bind [b],
+                                    :then {:type :bind, :bind [c], :expr [a b c]}},
+                             :else {:type :bind,
+                                    :bind [b],
+                                    :then {:type :bind, :bind [c], :expr [a b c]}}}}},
+        :else {:type :bind,
+               :bind [a],
+               :then {:type :bind, :bind [b], :expr [a b]}}},
+ :else {:type :ltrl,
+        :ltrl Nothing,
+        :expr [],
+        :else {:type :bind, :bind [_], :expr []}}}
