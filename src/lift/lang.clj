@@ -1,6 +1,7 @@
 (ns lift.lang
   (:refer-clojure :exclude [case read = not=])
   (:require
+   [lift.lang.case :as case]
    [lift.lang.interface :as iface]
    [lift.lang.prim :as prim]
    [lift.lang.type :as type]
@@ -21,8 +22,8 @@
   [type & impls]
   (iface/impl type impls))
 
-(defmacro case [x & exprs]
-  (type/case x exprs))
+(defmacro case [x & pattern-exprs]
+  (case/case x pattern-exprs))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)

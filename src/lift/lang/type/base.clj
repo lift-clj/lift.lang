@@ -126,7 +126,7 @@
 
 (impl/deftype (Prim f t)
   Functor (-map [x _] x)
-  IFn     (invoke [_ x] (f x)))
+  IFn     (invoke [_ x] ((eval f) x)))
 
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))

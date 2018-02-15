@@ -1,12 +1,13 @@
 (ns dev
-  (:refer-clojure :exclude [var?])
+  (:refer-clojure :exclude [case])
   (:require
    [clojure.core :as c]
    [clojure.pprint :refer [pprint]]
-   [lift.lang :refer [data Just Pair]]
+   [lift.lang :refer [case data Just Nothing Pair]]
    [lift.f.functor :as f]
    [lift.lang.util :as u]
-   [lift.lang.type :as t]))
+   [lift.lang.type :as t]
+   [lift.lang.prim :as prim]))
 
 ;; (base/import-syntax-types)
 ;; (base/import-type-types)
@@ -23,140 +24,131 @@
 ;;   [S a] a
 ;;   Nothing 0)
 
-(defn type? [x]
-  (and (simple-symbol? x) (re-matches #"^[A-Z].*$" (name x))))
+(defmacro pattern-1 [x]
+  `(case ~x
+     [Pair [Pair [Just ~'a] [Just ~'b]] ~'c] [~'a ~'b ~'c]
+     [Pair [Pair       ~'d  [Just ~'e]] ~'f] [~'d ~'e ~'f]
+     [Pair [Pair [Just ~'g]       ~'h ] ~'i] [~'g ~'h ~'i]
+     [Pair             ~'j              ~'k] [~'j ~'k    ]
+     Nothing                                 [0          ]
+     ~'_                                     [           ]))
 
-(defn var? [x]
-  (and (simple-symbol? x) (re-matches #"^[^A-Z].*$" (name x))))
+(= (pattern-1 (Pair (Pair (Just 'a) (Just 'b)) 'c)) '[a b c])
+(= (pattern-1 (Pair (Pair       'd  (Just 'e)) 'f)) '[d e f])
+(= (pattern-1 (Pair (Pair (Just 'g)       'h)  'i)) '[g h i])
+(= (pattern-1 (Pair             'j             'k)) '[j k  ])
+(= (pattern-1 Nothing                             ) '[0    ])
+(= (pattern-1 '_                                  ) '[     ])
 
-(let [n (atom 0)]
-  (defn gsym [& _]
-    (symbol (str "_" (swap! n inc)))))
+(case (Pair (Pair (Just 1) 2) 3)
+  [Pair [Pair [Just a] [Just b]] c] [a b c]
+  [Pair [Pair       d  [Just e]] f] [d e f]
+  [Pair [Pair [Just g]       h ] i] [g h i]
+  [Pair             j            k] [j k  ]
+  Nothing                           [0    ]
+  _                                 [     ])
 
-(declare case-tree)
+;; (def case-tree-1
+;;   (let [x 'Nothing]
+;;     (-> nil
+;;         (case-tree x '[Pair [Pair [Just a] [Just b]] c] '[a b c] nil)
+;;         (case-tree x '[Pair [Pair       d  [Just e]] f] '[d e f] nil)
+;;         (case-tree x '[Pair [Pair [Just g]       h ] i] '[g h i] nil)
+;;         (case-tree x '[Pair             j            k] '[j k  ] nil)
+;;         (case-tree x 'Nothing                           '[     ] nil)
+;;         (case-tree x '_                                 '[     ] nil)
+;;         (default-case nil))))
 
-(defn bind [n x m e l]
-  (if n
-    (if l
-      (-> (update n :bind conj m) (update :then l))
-      (throw (Exception. "Trying to make final binding twice")))
-    (if l
-      {:type :bind :bind [m] :thex x :then (l nil)}
-      {:type :bind :bind [m] :thex x :expr e})))
+;; (def case-source (emit-case case-tree-1))
 
-(defn dest [n x m e l]
-  (let [[p & ms] m
-        prjs (map (juxt gsym identity) ms)
-        sjrp (reverse prjs)
-        l-fn (fn [l [gs m]]
-               (fn [n]
-                 (case-tree n gs m e l)))
-        l'   (reduce l-fn (l-fn l (first sjrp)) (rest sjrp))]
-    (if n
-      (if (= p (:test n))
-        (update n :then l')
-        (update n :else l' ))
-      {:type :dest
-       :test p
-       :thex x
-       :prjs (mapv first prjs)
-       :then (l' nil)})))
+;; (if (clojure.core/instance? lift.lang.__private.Pair Nothing)
+;;   (let* [_29397 (Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a)))
+;;          _29398 (Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b)))]
+;;     (if (clojure.core/instance? lift.lang.__private.Pair _29397)
+;;       (let* [_29399 (Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 0)) ((Pair (Var a), (Var b)) -> (Var a)))
+;;              _29400 (Prim (clojure.core/fn -prj-Pair [x] (clojure.core/nth x 1)) ((Pair (Var a), (Var b)) -> (Var b)))]
+;;         (if (clojure.core/instance? lift.lang.__private.Just _29399)
+;;           (let* [_29401 (Prim (clojure.core/fn -prj-Just [x] (clojure.core/nth x 0)) ((Maybe (Var a)) -> (Var a)))]
+;;             (let* [a _29401 g _29401]
+;;               (if (clojure.core/instance? lift.lang.__private.Just _29400)
+;;                 (let* [_29402 (Prim (clojure.core/fn -prj-Just [x] (clojure.core/nth x 0)) ((Maybe (Var a)) -> (Var a)))]
+;;                   (let* [b _29402]
+;;                     (let* [c _29398] [a b c])))
+;;                 (let* [h _29400]
+;;                   (let* [i _29398] [g h i])))))
+;;           (let* [d _29399]
+;;             (if (clojure.core/instance? lift.lang.__private.Just _29400)
+;;               (let* [_29403 (Prim (clojure.core/fn -prj-Just [x] (clojure.core/nth x 0)) ((Maybe (Var a)) -> (Var a)))]
+;;                 (let* [e _29403]
+;;                   (let* [f _29398] [d e f])))
+;;               (let* [j _29397]
+;;                 (let* [k _29398] [j k]))))))
+;;       (let* [j _29397]
+;;         (let* [k _29398] [j k]))))
+;;   (if (lift.lang.prim/eq Nothing Nothing) [] (let* [_ Nothing] [])))
 
-(defn lit-eq [n x m e l]
-  (if n
-    (if (= m (:ltrl n))
-      (update n :then l)
-      (update n :else l))
-    (if l
-      {:type :ltrl :ltrl m :thex x :then (l nil)}
-      {:type :ltrl :ltrl m :thex x :expr e})))
-
-(defn case-tree [n x m e l]
-  (let [t (:type n)]
-    (cond (and (vector? m) (or (nil? n) (= t :dest)))
-          (dest n x m e l)
-          (vector? m)
-          (throw (Exception. "Trying to match pattern after irrefutable bind"))
-          (and (var? m) (or (nil? n) (= t :bind)))
-          (bind n x m e l)
-          (var? m)
-          (update n :else case-tree x m e l)
-          (or (nil? n) (= t :ltrl))
-          (lit-eq n x m e l)
-          :else
-          (update n :else case-tree x m e l))))
-
-(defn default-case [{:keys [type then else] :as n} default]
-  (if (contains? #{:dest :ltrl} type)
-    (if then
-      (-> (update n :then default-case (or else default))
-          (cond-> (and (nil? else) default)
-            (assoc :else default)))
-      (if default
-        (update n :else default-case default)
-        n))
-    n))
-
-(def case-tree-1
-  (let [x 'Nothing]
-    (-> nil
-        (case-tree x '[Pair [Pair [Just a] [Just b]] c] '[a b c] nil)
-        (case-tree x '[Pair [Pair       a  [Just b]] c] '[a b c] nil)
-        (case-tree x '[Pair [Pair       a        b ] c] '[a b c] nil)
-        (case-tree x '[Pair             a        b    ] '[a b  ] nil)
-        (case-tree x 'Nothing                           '[     ] nil)
-        (case-tree x '_                                 '[     ] nil)
-        (default-case nil))))
-
-(case x
-  [Pair a b] [a b]
-  )
-
-{:type :dest,
- :test Pair,
- :thex Nothing,
- :prjs [_263 _264],
- :then {:type :dest,
-        :test Pair,
-        :thex _263,
-        :prjs [_265 _266],
-        :then {:type :dest,
-               :test Just,
-               :thex _265,
-               :prjs [_267],
-               :then {:type :bind,
-                      :bind [a],
-                      :thex _267,
-                      :then {:type :dest,
-                             :test Just,
-                             :thex _266,
-                             :prjs [_268],
-                             :then {:type :bind,
-                                    :bind [b],
-                                    :thex _268,
-                                    :then {:type :bind, :bind [c], :thex _264, :expr [a b c]}}}},
-               :else {:type :bind,
-                      :bind [a a],
-                      :thex _271,
-                      :then {:type :dest,
-                             :test Just,
-                             :thex _272,
-                             :prjs [_273],
-                             :then {:type :bind,
-                                    :bind [b],
-                                    :thex _273,
-                                    :then {:type :bind, :bind [c], :thex _270, :expr [a b c]}},
-                             :else {:type :bind,
-                                    :bind [b],
-                                    :thex _277,
-                                    :then {:type :bind, :bind [c], :thex _275, :expr [a b c]}}}}},
-        :else {:type :ltrl,
-               :ltrl Nothing,
-               :thex Nothing,
-               :expr [],
-               :else {:type :bind, :bind [_], :thex Nothing, :expr []}}},
- :else {:type :ltrl,
-        :ltrl Nothing,
-        :thex Nothing,
-        :expr [],
-        :else {:type :bind, :bind [_], :thex Nothing, :expr []}}}
+;; {:type :dest,
+;;  :test Pair,
+;;  :thex Nothing,
+;;  :prjs [_29397 _29398],
+;;  :then {:type :dest,
+;;         :test Pair,
+;;         :thex _29397,
+;;         :prjs [_29399 _29400],
+;;         :then {:type :dest,
+;;                :test Just,
+;;                :thex _29399,
+;;                :prjs [_29401],
+;;                :then {:type :bind,
+;;                       :bind [a g],
+;;                       :thex _29401,
+;;                       :then {:type :dest,
+;;                              :test Just,
+;;                              :thex _29400,
+;;                              :prjs [_29402],
+;;                              :then {:type :bind,
+;;                                     :bind [b],
+;;                                     :thex _29402,
+;;                                     :then {:type :bind,
+;;                                            :bind [c],
+;;                                            :thex _29398,
+;;                                            :expr [a b c],
+;;                                            :else nil}},
+;;                              :else {:type :bind,
+;;                                     :bind [h],
+;;                                     :thex _29400,
+;;                                     :then {:type :bind
+;;                                            :bind [i]
+;;                                            :thex _29398
+;;                                            :expr [g h i]}}}}
+;;                :else {:type :bind,
+;;                       :bind [d],
+;;                       :thex _29399,
+;;                       :then {:type :dest,
+;;                              :test Just,
+;;                              :thex _29400,
+;;                              :prjs [_29403],
+;;                              :then {:type :bind,
+;;                                     :bind [e],
+;;                                     :thex _29403,
+;;                                     :then {:type :bind,
+;;                                            :bind [f],
+;;                                            :thex _29398,
+;;                                            :expr [d e f],
+;;                                            :else nil}},
+;;                              :else {:type :bind,
+;;                                     :bind [j],
+;;                                     :thex _29397,
+;;                                     :then {:type :bind
+;;                                            :bind [k]
+;;                                            :thex _29398
+;;                                            :expr [j k]}}}}}
+;;         :else {:type :bind,
+;;                :bind [j],
+;;                :thex _29397,
+;;                :then {:type :bind, :bind [k], :thex _29398, :expr [j k]}}},
+;;  :else {:type :ltrl,
+;;         :ltrl Nothing,
+;;         :thex Nothing,
+;;         :expr [],
+;;         :else {:type :bind, :bind [_], :thex Nothing, :expr []}}}
