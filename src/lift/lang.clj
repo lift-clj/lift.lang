@@ -1,7 +1,8 @@
 (ns lift.lang
-  (:refer-clojure :exclude [case read = not=])
+  (:refer-clojure :exclude [case defn read = not=])
   (:require
    [lift.lang.case :as case]
+   [lift.lang.defn :as defn]
    [lift.lang.interface :as iface]
    [lift.lang.prim :as prim]
    [lift.lang.type :as type]
@@ -10,7 +11,7 @@
 (defmacro data
   {:style/indent :defn}
   [& decl]
-  (data/data decl))
+  (data/data* decl))
 
 (defmacro interface
   {:style/indent :defn}
@@ -24,6 +25,9 @@
 
 (defmacro case [x & pattern-exprs]
   (case/case* x pattern-exprs))
+
+(defmacro defn [name & decl]
+  (defn/defn* name decl))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)

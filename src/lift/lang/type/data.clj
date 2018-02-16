@@ -70,7 +70,7 @@
       ~(impl/prn-impl (class obj))
       (def/intern-type-sig '~(u/resolve-sym tag) ~sig)]))
 
-(defn data [decl]
+(defn data* [decl]
   (let [{:keys [type-cons] :as parsed} (def/parse-data-decl decl)
         args (mapv :a (.-args type-cons))
         tag (symbol (name (.-tag type-cons)))
@@ -85,3 +85,8 @@
               (value-impl (:x part) sig)))
           (or (:sum-cons parsed) [(:value-cons parsed)]))
        ~sig)))
+
+(defmacro data
+  {:style/indent :defn}
+  [& decl]
+  (data* decl))

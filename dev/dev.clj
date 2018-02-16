@@ -1,5 +1,5 @@
 (ns dev
-  (:refer-clojure :exclude [case])
+  (:refer-clojure :exclude [case defn])
   (:require
    [clojure.core :as c]
    [clojure.pprint :refer [pprint]]
@@ -59,3 +59,10 @@
    [Pair Nothing [Pair [Just a] b]] (Pair (Just a) 3)
    [Pair Nothing  x               ] x
    ))
+
+(lift
+ (defn =
+   ([[Just a] [Just b]] (Tuple2 a b))
+   ([[Just a] Nothing ] (Tuple2 a 7))
+   ([Nothing  [Just b]] (Tuple2 7 b))
+   ([Nothing  Nothing ] (Tuple2 7 7))))
