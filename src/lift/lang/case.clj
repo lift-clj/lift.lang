@@ -1,5 +1,5 @@
 (ns lift.lang.case
-  (:refer-clojure :exclude [case])
+  (:refer-clojure :exclude [var?])
   (:require [lift.lang.type :as t]))
 
 (defn var? [x]
@@ -86,7 +86,8 @@
           n)))))
 
 (def emit-case nil)
-(defmulti emit-case (fn [x] (prn x) (:type x)))
+;; (defmulti emit-case (fn [x] (prn x) (:type x)))
+(defmulti emit-case :type)
 
 (defmethod emit-case :dest [{:keys [test thex prjs then else]}]
   (let [{:keys [isa? fs]} (-> test resolve meta :prj)]
@@ -99,19 +100,29 @@
   `(let* [~@(mapcat (juxt identity (constantly thex)) bind)]
      ~(if expr expr (emit-case then))))
 
-(defmethod emit-case :ltrl [{:keys [ltrl thex expr else]}]
+(defmethod emit-case :ltrl [{:keys [ltrl thex then expr else]}]
   `(if (lift.lang.prim/eq ~ltrl ~thex)
-     ~expr
+     ~(if then (emit-case then) expr)
      ~(if else
         (emit-case else)
         `(t/unmatched-case-error ~thex))))
 
-(defn case [x pattern-exprs]
+(defmethod emit-case :uerr [{:keys [expr]}]
+  expr)
+
+(defn case* [x pattern-exprs]
   (let [gs (gensym)]
     `(let [~gs ~x]
        ~(-> (->> (partition 2 pattern-exprs)
                  (reduce (fn [tree [pattern expr]]
                            (case-tree tree gs pattern expr nil))
                          nil))
-            (default-case nil)
+            (default-case {:type :uerr :expr `(t/unmatched-case-error ~gs)})
             (emit-case)))))
+
+;; TODO: need vector destructuring to n-tuple
+;; (defn defn-match [name & param-exprs]
+;;   `(defn ~name
+;;      ~(case* )
+;;      )
+;;   )

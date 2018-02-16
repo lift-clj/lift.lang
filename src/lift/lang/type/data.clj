@@ -41,7 +41,7 @@
           :fs (mapv (fn [i# t#]
                       (Prim.
                        (list 'fn '~(prj-name tag) ['~'x] (list 'nth '~'x i#))
-                       (Arrow. ~sig t#)))
+                       (Forall. (base/ftv ~sig) (Arrow. ~sig t#))))
                     (range)
                     ~args)}})
 

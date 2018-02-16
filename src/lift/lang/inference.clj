@@ -115,7 +115,7 @@
           s5 (unify t2 t3)]
       [(compose s5 s4 s3 s2 s1) ($ (If. cond then else) (t/substitute t2 s5))]))
 
-  ([_Gamma [Prim :as p]] [id p])
+  ([_Gamma [Prim f t]] [id (Prim. f (instantiate t))])
 
   ([_ x]
    (throw (Exception. (str "Unrecognized syntax: " (pr-str x))))))
@@ -124,8 +124,19 @@
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
 
+(defn -infer-ann-err [x]
+  (fn [env]
+    (try
+      (-infer env x)
+      (catch clojure.lang.ExceptionInfo e
+        (let [d (ex-data e)]
+          (throw (ex-info "Inference failure" {:x x :next d}))))
+      (catch Throwable t
+        (throw
+         (ex-info "Inference failure" {:x x :cause t}))))))
+
 (defn check
   ([expr] (check @t/type-env expr))
   ([env expr]
-   (let [[s ast] ((hylo (fn [x] (fn [env] (-infer env x))) ana/parse expr) env)]
+   (let [[s ast] ((hylo -infer-ann-err ana/parse expr) env)]
      (t/substitute ast s))))

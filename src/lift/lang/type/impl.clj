@@ -111,7 +111,9 @@
      (format "(%s %s)" ~(pr-str tag) (string/join " " (map pr-str ~args)))))
 
 (defn prn-impl [classname]
-  `(defmethod print-method ~classname [~'x ~'w] (.write ~'w (show ~'x))))
+  `(do
+     (defmethod print-method ~classname [~'x ~'w] (.write ~'w (show ~'x)))
+     (defmethod print-dup ~classname [~'x ~'w] (.write ~'w (show ~'x)))))
 
 (defn functor-impl [tag args]
   (let [f (gensym)]

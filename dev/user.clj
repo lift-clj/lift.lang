@@ -3,7 +3,7 @@
   (:require
    ;; [clojure.core :as c]
    ;; [clojure.pprint :refer [pprint]]
-   ;; [clojure.tools.namespace.repl :refer [refresh]]
+   [clojure.tools.namespace.repl :refer [refresh]]
    [lift.lang :refer :all]
    [lift.lang.analyze :as ana]
    [lift.lang.inference :refer [check -infer infer]]

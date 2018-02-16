@@ -23,7 +23,7 @@
   (iface/impl type impls))
 
 (defmacro case [x & pattern-exprs]
-  (case/case x pattern-exprs))
+  (case/case* x pattern-exprs))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)
@@ -40,11 +40,11 @@
    (=    [x y] (not (not= x y)))
    (not= [x y] (not (= x y)))))
 
-;; (impl (Eq Long)
-;;   (= [x y] (prim/=Long x y)))
+(impl (Eq Long)
+  (= [x y] (prim/=Long x y)))
 
-;; (impl (Eq Character)
-;;   (= [x y] (prim/=Character x y)))
+(impl (Eq Character)
+  (= [x y] (prim/=Character x y)))
 
 ;; ;; (impl (Eq Maybe)
 ;; ;;   (=
