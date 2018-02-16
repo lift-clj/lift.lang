@@ -3,7 +3,7 @@
   (:require
    [clojure.core :as c]
    [clojure.pprint :refer [pprint]]
-   [lift.lang :refer [case data Just Nothing Pair]]
+   [lift.lang :refer [case data defn Just Nothing Pair]]
    [lift.f.functor :as f]
    [lift.lang.rewrite :refer [emit rewrite]]
    [lift.lang.util :as u]
@@ -60,9 +60,9 @@
    [Pair Nothing  x               ] x
    ))
 
-(lift
- (defn =
-   ([[Just a] [Just b]] (Tuple2 a b))
-   ([[Just a] Nothing ] (Tuple2 a 7))
-   ([Nothing  [Just b]] (Tuple2 7 b))
-   ([Nothing  Nothing ] (Tuple2 7 7))))
+;; lift
+(defn =
+  ([[Just a] [Just b]] [a b])
+  ([[Just a] Nothing ] [a 7])
+  ([Nothing  [Just b]] [7 b])
+  ([Nothing  Nothing ] [7 7]))

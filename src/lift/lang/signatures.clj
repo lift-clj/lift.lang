@@ -11,7 +11,8 @@
    [lift.lang.type.base :as base]
    [lift.lang.type.impl :as impl]
    [lift.lang.unification :refer [unify]]
-   [lift.lang.util :as u]))
+   [lift.lang.util :as u]
+   [riddley.walk :as walk]))
 
 (base/import-syntax-types)
 (base/import-type-types)
@@ -205,7 +206,7 @@
   (letfn [(f [{:keys [f arglist expr]}]
             (let [f       (u/resolve-sym f)
                   _Gamma       (assoc @t/type-env pred ::temp)
-                  [e t]   (check (list 'fn arglist expr))
+                  [e t]   (check (walk/macroexpand-all (list 'fn arglist expr)))
                   [as pt] (get _Gamma f)
                   _ (assert pt (format "Symbol %s not found in env" f))
                   [ps t'] pt

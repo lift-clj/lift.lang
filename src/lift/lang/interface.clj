@@ -66,8 +66,7 @@
        (swap! t/type-env assoc '~class ~pred)
        '~t)))
 
-(defn impl {:style/indent :defn}
-  [[tag & as] impls]
+(defn impl [[tag & as] impls]
   (let [consts (map #(Const. %) as)
         [_ bs] (get @t/type-env tag)
         pred   (Predicate. tag consts)
@@ -75,7 +74,6 @@
     `(do
        (swap! t/type-env assoc ~pred ~(sig/impl pred sub impls))
        (list ~pred))))
-
 
 ;; (interface (Show a)
 ;;   show (a -> String))

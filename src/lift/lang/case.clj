@@ -1,9 +1,34 @@
 (ns lift.lang.case
   (:refer-clojure :exclude [var?])
-  (:require [lift.lang.type :as t]))
+  (:require
+   [lift.lang.type.data :refer [data]]
+   [lift.lang.type :as t]
+   [clojure.spec.alpha :as s]))
 
-(defn var? [x]
-  (and (simple-symbol? x) (re-matches #"^[^A-Z].*$" (name x))))
+(data Tuple1 a = Tuple1 a)
+(data Tuple2 a b = Tuple2 a b)
+(data Tuple3 a b c = Tuple3 a b c)
+(data Tuple4 a b c d = Tuple4 a b c d)
+(data Tuple5 a b c d e = Tuple5 a b c d e)
+(data Tuple6 a b c d e f = Tuple6 a b c d e f)
+(data Tuple7 a b c d e f g = Tuple7 a b c d e f g)
+(data Tuple8 a b c d e f g h = Tuple8 a b c d e f g h)
+(data Tuple9 a b c d e f g h i = Tuple9 a b c d e f g h i)
+
+(def tpl `[Tuple1 Tuple2 Tuple3 Tuple4 Tuple5 Tuple6 Tuple7 Tuple8 Tuple9])
+
+(defn tuple
+  ([vars] (tuple (count vars) vars))
+  ([n vars] `(~(nth tpl (dec n)) ~@vars)))
+
+(s/def ::ctor (s/and symbol? #(re-matches #"^[A-Z].*$" (name %))))
+(s/def ::var  (s/and simple-symbol? #(re-matches #"^[^A-Z].*$" (name %))))
+(s/def ::tupl (s/coll-of any? :kind vector?))
+(s/def ::dtor (s/and seq? (s/cat :ctor ::ctor :args (s/+ any?))))
+
+(defn var?  [x] (s/valid? ::var x))
+(defn tupl? [x] (s/valid? ::tupl x))
+(defn dtor? [x] (s/valid? ::dtor x))
 
 (defn gsym [& _]
   (gensym '_))
@@ -50,10 +75,13 @@
       {:type :ltrl :ltrl m :thex x :expr e})))
 
 (defn case-tree [n x m e l]
+  (prn m)
   (let [t (:type n)]
-    (cond (and (vector? m) (or (nil? n) (= t :dest)))
+    (cond (tupl? m)
+          (case-tree n x (tuple m) e l)
+          (and (dtor? m) (or (nil? n) (= t :dest)))
           (dest n x m e l)
-          (vector? m)
+          (dtor? m)
           (throw (Exception. "Trying to match pattern after irrefutable bind"))
           (and (var? m) (or (nil? n) (= t :bind)))
           (bind n x m e l)
@@ -111,8 +139,9 @@
   expr)
 
 (defn case* [x pattern-exprs]
-  (let [gs (gensym)]
-    `(let [~gs ~x]
+  (let [gs (gensym)
+        x' (if (tupl? x) (tuple x) x)]
+    `(let [~gs ~x']
        ~(-> (->> (partition 2 pattern-exprs)
                  (reduce (fn [tree [pattern expr]]
                            (case-tree tree gs pattern expr nil))

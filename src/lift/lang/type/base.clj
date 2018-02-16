@@ -125,8 +125,9 @@
   Functor (-map [_ f] (If. (f cond) (f then) (f else))))
 
 (impl/deftype (Prim f t)
-  Functor (-map [x _] x)
-  IFn     (invoke [_ x] ((eval f) x)))
+  Functor (-map   [x _] x)
+  IFn     (invoke [_ x] ((eval f) x))
+  Show    (-show  [_  ] (name (second f))))
 
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))

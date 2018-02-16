@@ -19,7 +19,7 @@
   (iface/interface type decl))
 
 (defmacro impl
-  {:style/indent :defn}
+  {:style/indent [:defn [1]]}
   [type & impls]
   (iface/impl type impls))
 
@@ -44,17 +44,22 @@
    (=    [x y] (not (not= x y)))
    (not= [x y] (not (= x y)))))
 
+(fn* needs to be added to syntax parsing)
 (impl (Eq Long)
   (= [x y] (prim/=Long x y)))
 
 (impl (Eq Character)
   (= [x y] (prim/=Character x y)))
 
-;; ;; (impl (Eq Maybe)
-;; ;;   (=
-;; ;;    ([[Just x] [Just y]] (= x y))
-;; ;;    ([Nothing   Nothing] True)
-;; ;;    ([_         _      ] False)))
+(fn* needs to be added to syntax parsing)
+(impl (Eq Maybe)
+  (= [x y]
+    (case [x y]
+      [(Just x) (Just y)] (= x y)
+      [Nothing   Nothing] True
+      [_         _      ] False)))
+
+;; TODO: Eq Maybe is correct, Eq (Maybe a) is odd
 
 ;; (interface (Read a)
 ;;   (read (String -> a)))
