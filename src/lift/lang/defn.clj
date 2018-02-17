@@ -13,5 +13,5 @@
        [~@vs]
        ~(case/case*
          (case/tuple n vs)
-         (mapcat (fn [[match expr]] `[~(vec (tuple n match)) ~expr])
+         (mapcat (fn [[match expr]] `[~(case/tuple n match) ~expr])
                  exprs)))))

@@ -44,34 +44,37 @@
    (=    [x y] (not (not= x y)))
    (not= [x y] (not (= x y)))))
 
-(fn* needs to be added to syntax parsing)
+;; (fn* needs to be added to syntax parsing)
 (impl (Eq Long)
   (= [x y] (prim/=Long x y)))
 
 (impl (Eq Character)
   (= [x y] (prim/=Character x y)))
 
-(fn* needs to be added to syntax parsing)
-(impl (Eq Maybe)
-  (= [x y]
-    (case [x y]
-      [(Just x) (Just y)] (= x y)
-      [Nothing   Nothing] True
-      [_         _      ] False)))
+(impl (Eq String)
+  (= [x y] (prim/=String x y)))
+
+;; ;; (fn* needs to be added to syntax parsing)
+;; (impl (Eq Maybe)
+;;   (= [x y]
+;;     (case [x y]
+;;       [(Just x) (Just y)] (= x y)
+;;       [Nothing   Nothing] True
+;;       [_         _      ] False)))
 
 ;; TODO: Eq Maybe is correct, Eq (Maybe a) is odd
 
-;; (interface (Read a)
-;;   (read (String -> a)))
+(interface (Read a)
+  (read (String -> a)))
 
-;; (impl (Read Long)
-;;   (read [s] (prim/readLong s)))
+(impl (Read Long)
+  (read [s] (prim/readLong s)))
 
-;; (impl (Read Character)
-;;   (read [s] (prim/readCharacter s)))
+(impl (Read Character)
+  (read [s] (prim/readCharacter s)))
 
-;; (interface (Coercible a b)
-;;   (coerce (a -> b)))
+(interface (Coercible a b)
+  (coerce (a -> b)))
 
-;; (impl (Coercible String Long)
-;;   (coerce [a] (read a)))
+(impl (Coercible String Long)
+  (coerce [a] (read a)))

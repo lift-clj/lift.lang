@@ -4,6 +4,9 @@
 (t/def =Character (Character -> Character -> Boolean))
 (defn =Character [^Character x ^Character y] (.equals x y))
 
+(t/def =String (String -> String -> Boolean))
+(defn =String [^String x ^String y] (.equals x y))
+
 (t/def =Integer (Integer -> Integer -> Boolean))
 (defn =Integer [^Integer x ^Integer y] (.equals x y))
 

@@ -7,4 +7,9 @@
                  [org.clojure/data.xml "0.0.8"]
                  [riddley "0.1.14"]
                  [lift/f "0.1.0"]]
-  :profiles {:dev {:source-paths ["dev"]}})
+  :profiles
+  {:dev
+   {:source-paths ["dev"]
+    :injections [(require 'lift.middleware)]
+    :repl-options
+    {:nrepl-middleware [lift.middleware/repl]}}})

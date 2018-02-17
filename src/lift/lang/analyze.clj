@@ -46,6 +46,9 @@
   (s/and seq? (s/cat :lamb #{'fn}
                      :bind ::arglist
                      :expr any?)))
+(s/def ::fn*
+  (s/and seq? (s/cat :fn* #{'fn* 'fn}
+                     :ar1 (s/and seq? (s/cat :bind ::arglist :expr any?)))))
 
 (s/def ::variadic
   (s/and seq?
@@ -95,6 +98,7 @@
         :Lit ::literal
         :VFn ::variadic
         :Lam ::lambda
+        :Fn* ::fn*
         :Let ::let
         :If  ::if
         :Sel ::record-selection
@@ -144,6 +148,11 @@
                #(Lambda. %2 %)
                (cons expr (map #(Symbol. %) (reverse arglist)))))
 
+(defmethod -parse :Fn* [_ [_ [arglist expr]]]
+  (encode-args :curry
+               #(Lambda. %2 %)
+               (cons expr (map #(Symbol. %) (reverse arglist)))))
+
 (defmethod -parse :App [_ [op & args]]
   (encode-args :curry #(Apply. % %2) (cons op args)))
 
@@ -179,22 +188,3 @@
         (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
                         (s/explain-data ::expr expr))))
       (-parse (first conformed) expr))))
-
-;; (->> '(fn
-;;         ([a] [a])
-;;         ([a b] [a b])
-;;         ([a b c] [a b c]))
-;;      (ana ; (fn [expr] (fn [env] (check/infer expr env)))
-;;            parse)
-;;     ;; (#(% check/empty-env))
-;;     ;; second
-;;     ;; :type
-;;  )
-
-;; (->> '[1 2]
-;;      (hylo (fn [expr] (fn [env] (check/infer expr env)))
-;;            parse)
-;;      (#(% (assoc check/empty-env :type @type-env)))
-;;      second
-;;      :type
-;;      )

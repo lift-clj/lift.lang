@@ -38,6 +38,7 @@
 (impl/deftype (Var a)
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{a})
+  Show    (-show [_]   (name a))
   Sub     (-sub  [x s] (get s a x)))
 
 (impl/deftype (Vargs a)
@@ -131,7 +132,9 @@
 
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))
-  Show    (-show [_]   (str n (when t (str ":" (pr-str t)))))
+  Show    (-show [_]
+            (str (if (instance? lift.lang.type.impl.Type n) n (pr-str n))
+                 (when t (str " : " (pr-str t)))))
   Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s))))
 
 (impl/deftype (Curry f)

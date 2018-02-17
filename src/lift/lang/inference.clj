@@ -27,8 +27,8 @@
   ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
 (defn lookup [_Gamma a]
-  (or (get _Gamma a)
-      (get _Gamma (u/resolve-sym a))
+  (or (if-let [t (get _Gamma a)] [a t])
+      (let [a' (u/resolve-sym a)] (if-let [t (get _Gamma a')] [a' t]))
       (u/unbound-variable-error a)))
 
 (defn instantiate [[as t :as x]]
@@ -44,10 +44,16 @@
     (-vec t)
     [nil t]))
 
+(p/defn concrete-instance?
+  ([[Predicate _ as :as p]]
+   (every? #(instance? Const %) as))
+  ([_] false))
+
 (defn release? [_Gamma p]
   (or (nil? p)
       (contains? _Gamma p)
-      (assume? p)
+      (and (not (concrete-instance? p))
+           (assume? p))
       (throw (Exception. (format "No instance of %s in Γ" (pr-str p))))))
 
 (defn with-pred [_Gamma preds t]
@@ -83,7 +89,8 @@
 (p/defn -infer
   ([_Gamma [Literal _ :as expr]] [id ($ expr (ana/type expr))])
 
-  ([_Gamma [Symbol a :as expr]] [id ($ expr (instantiate (lookup _Gamma a)))])
+  ([_Gamma [Symbol a :as expr]]
+   (let [[a t] (lookup _Gamma a)] [id ($ (Symbol. a) (instantiate t))]))
 
   ([_Gamma [Lambda [a] e]]
    (let [tv (Var. (gensym 'ξ))
@@ -130,10 +137,13 @@
       (-infer env x)
       (catch clojure.lang.ExceptionInfo e
         (let [d (ex-data e)]
-          (throw (ex-info "Inference failure" {:x x :next d}))))
+          (throw
+           (ex-info (str "Inference failure: " (-> d :cause :cause))
+                    {:x x :next d}))))
       (catch Throwable t
         (throw
-         (ex-info "Inference failure" {:x x :cause t}))))))
+         (ex-info (str "Inference failure: " (.getMessage t))
+                  {:x x :cause t}))))))
 
 (defn check
   ([expr] (check @t/type-env expr))

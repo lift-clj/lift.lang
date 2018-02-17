@@ -27,42 +27,42 @@
 ;;   [S a] a
 ;;   Nothing 0)
 
-(defmacro pattern-1 [x]
-  `(case ~x
-     [Pair [Pair [Just ~'a] [Just ~'b]] ~'c] [~'a ~'b ~'c]
-     [Pair [Pair       ~'d  [Just ~'e]] ~'f] [~'d ~'e ~'f]
-     [Pair [Pair [Just ~'g]       ~'h ] ~'i] [~'g ~'h ~'i]
-     [Pair             ~'j              ~'k] [~'j ~'k    ]
-     Nothing                                 [0          ]
-     ~'_                                     [           ]))
+;; (defmacro pattern-1 [x]
+;;   `(case ~x
+;;      [Pair [Pair [Just ~'a] [Just ~'b]] ~'c] [~'a ~'b ~'c]
+;;      [Pair [Pair       ~'d  [Just ~'e]] ~'f] [~'d ~'e ~'f]
+;;      [Pair [Pair [Just ~'g]       ~'h ] ~'i] [~'g ~'h ~'i]
+;;      [Pair             ~'j              ~'k] [~'j ~'k    ]
+;;      Nothing                                 [0          ]
+;;      ~'_                                     [           ]))
 
-(= (pattern-1 (Pair (Pair (Just 'a) (Just 'b)) 'c)) '[a b c])
-(= (pattern-1 (Pair (Pair       'd  (Just 'e)) 'f)) '[d e f])
-(= (pattern-1 (Pair (Pair (Just 'g)       'h)  'i)) '[g h i])
-(= (pattern-1 (Pair             'j             'k)) '[j k  ])
-(= (pattern-1 Nothing                             ) '[0    ])
-(= (pattern-1 '_                                  ) '[     ])
+;; (= (pattern-1 (Pair (Pair (Just 'a) (Just 'b)) 'c)) '[a b c])
+;; (= (pattern-1 (Pair (Pair       'd  (Just 'e)) 'f)) '[d e f])
+;; (= (pattern-1 (Pair (Pair (Just 'g)       'h)  'i)) '[g h i])
+;; (= (pattern-1 (Pair             'j             'k)) '[j k  ])
+;; (= (pattern-1 Nothing                             ) '[0    ])
+;; (= (pattern-1 '_                                  ) '[     ])
 
-(defmacro check [expr]
-  `(infer/check (walk/macroexpand-all '~expr)))
+;; (defmacro check [expr]
+;;   `(infer/check (walk/macroexpand-all '~expr)))
 
-(defmacro lift [expr]
-  `(->> '~expr
-        (walk/macroexpand-all)
-        (infer/check)
-        (rewrite @t/type-env)
-        (emit)
-        (eval)))
+;; (defmacro lift [expr]
+;;   `(->> '~expr
+;;         (walk/macroexpand-all)
+;;         (infer/check)
+;;         (rewrite @t/type-env)
+;;         (emit)
+;;         (eval)))
 
-(lift
- (case (Pair Nothing (Pair (Just 1) 2))
-   [Pair Nothing [Pair [Just a] b]] (Pair (Just a) 3)
-   [Pair Nothing  x               ] x
-   ))
+;; (lift
+;;  (case (Pair Nothing (Pair (Just 1) 2))
+;;    [Pair Nothing [Pair [Just a] b]] (Pair (Just a) 3)
+;;    [Pair Nothing  x               ] x
+;;    ))
 
-;; lift
-(defn =
-  ([[Just a] [Just b]] [a b])
-  ([[Just a] Nothing ] [a 7])
-  ([Nothing  [Just b]] [7 b])
-  ([Nothing  Nothing ] [7 7]))
+;; ;; lift
+;; (defn =
+;;   ([[Just a] [Just b]] [a b])
+;;   ([[Just a] Nothing ] [a 7])
+;;   ([Nothing  [Just b]] [7 b])
+;;   ([Nothing  Nothing ] [7 7]))
