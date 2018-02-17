@@ -82,7 +82,8 @@
 (impl/deftype (Row k v tail)
   Functor (-map  [_ f] (Row. k (f v) (f tail)))
   Ftv     (-ftv  [_]   (union v tail))
-  Show    (-show [_]   (format "%s : %s, %s" (pr-str k) v tail)))
+  Show    (-show [_]   (format "%s : %s, %s" (pr-str k) v tail))
+  Sub     (-sub  [_ s] (Row. (substitute k s) (v s) (tail s))))
 
 (impl/deftype (Record row)
   Ftv  (-ftv  [_] row)

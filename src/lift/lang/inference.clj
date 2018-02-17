@@ -105,7 +105,6 @@
          [s1 [_ t1 :as e1]] (e1 _Gamma)
          [s2 [_ t2 :as e2]] (e2 (t/substitute _Gamma s1))
          [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
-     (prn t1 t2)
      [(compose s3 s2 s1)
       ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))]))
 
