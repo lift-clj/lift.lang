@@ -1,0 +1,16 @@
+{:deps
+ {org.clojure/tools.nrepl {:mvn/version "0.2.13"}
+  cider/orchard {:mvn/version "0.1.0-SNAPSHOT"}
+  cider/cider-nrepl {:mvn/version "0.17.0-SNAPSHOT"}
+  refactor-nrepl {:mvn/version "2.4.0-SNAPSHOT"}
+  org.clojure/clojure {:mvn/version "1.9.0"}
+  org.clojure/tools.namespace {:mvn/version "0.3.0-alpha4"}
+  org.clojure/tools.reader {:mvn/version "1.1.1"}
+  org.clojure/test.check {:mvn/version "0.10.0-alpha2"}
+  rhizome {:mvn/version "0.2.9"}
+  org.clojure/data.xml {:mvn/version "0.0.8"}
+  riddley {:mvn/version "0.1.14"}
+  lift/f {:mvn/version "0.1.0"}}
+ :paths ["src" "dev"]}
+
+;; -e '(require (quote cider-nrepl.main)) (cider-nrepl.main/init ["cider.nrepl/cider-middleware" "lift.middleware/repl"])'
