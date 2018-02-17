@@ -15,3 +15,6 @@
          (case/tuple n vs)
          (mapcat (fn [[match expr]] `[~(case/tuple n match) ~expr])
                  exprs)))))
+
+(defmacro defn [name & decl]
+  (defn* name decl))

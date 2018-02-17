@@ -12,11 +12,11 @@
    [clojure.core.specs.alpha :as cs]
    [clojure.string :as string]
    [clojure.java.io :as io]
-   [riddley.walk :as walk]
    [lift.lang.inference :as infer]
    [lift.lang.rewrite :as rewrite]
    [lift.lang.type :as type]
-   [lift.lang.type.base :as base])
+   [lift.lang.type.base :as base]
+   [lift.lang.util :as u])
   (:import
    [lift.lang.type.base SyntaxNode Var]))
 
@@ -53,19 +53,19 @@
   (with-patched-reader (r/read-string s)))
 
 (defn check [expr]
-  (infer/check (walk/macroexpand-all expr)))
+  (infer/check (u/macroexpand-all expr)))
 
 (defn sub-pretty-vars
   ([[f & ftvs] [v & vars]]
    (if f (assoc (sub-pretty-vars ftvs vars) f v) {}))
   ([ftvs]
-   (-> (seq ftvs)
+   (-> (sort ftvs)
        (sub-pretty-vars (map (comp #(Var. %) symbol str char) (range 97 123)))
        (type/sub))))
 
 (defn lift [expr]
   (try
-    (let [[_ t :as expr] (-> expr walk/macroexpand-all infer/check)
+    (let [[_ t :as expr] (-> expr u/macroexpand-all infer/check)
           ftvs (base/ftv t)
           sub  (sub-pretty-vars ftvs)
           t'   (type/substitute t sub)]
@@ -143,7 +143,7 @@
 (resolve-macro 'ns)
 
 (defn macroexpand-all [x]
-  (walk/walk-exprs (constantly false) nil #{'ns} x))
+  (u/walk-exprs (constantly false) nil #{'ns} x))
 
 (def EOF (Object.))
 (defn- -load [resource]

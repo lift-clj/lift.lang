@@ -8,8 +8,9 @@
    [lift.lang.type.impl :as impl]
    [lift.lang.analyze :as ana])
   (:import
-   [clojure.lang Fn]))
+   [clojure.lang Fn IPersistentMap]))
 
+(base/import-container-types)
 (base/import-syntax-types)
 (base/import-type-types)
 
@@ -44,10 +45,13 @@
 (p/defn -emit
   ([[Literal a]] a)
   ([[Symbol a]] a)
+  ([[Key k]] k)
   ([[Lambda [Symbol x] e]] `(fn* [~x] ~e))
   ([[Apply e1 e2]] (list e1 e2))
   ([[Let x e1 e2]] (list 'let [x e1] e2))
   ([[If cond then else]] (list 'if cond then else))
+  ([[Select r l]] (list l r))
+  ([[Map r]] r)
   ([[Prim f]] f)
   ([[Curry f]] `(fn* [x#] (partial ~f x#)))
   ([expr]

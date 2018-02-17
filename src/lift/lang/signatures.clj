@@ -207,7 +207,6 @@
             (let [f       (u/resolve-sym f)
                   _Gamma       (assoc @t/type-env pred ::temp)
                   code    (walk/macroexpand-all (list 'fn arglist expr))
-                  _ (prn 'code code)
                   [e t]   (check code)
                   [as pt] (get _Gamma f)
                   _ (assert pt (format "Symbol %s not found in env" f))
@@ -215,7 +214,6 @@
                   _ (assert t')
                   [s p]   (rel-unify _Gamma t (t/substitute t' sub))
                   [_ t]   (infer/release t)]
-              (prn 'e e)
               (t/substitute (SyntaxNode. e t) s)))]
     (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
       (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c)))))

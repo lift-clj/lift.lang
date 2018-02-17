@@ -55,6 +55,27 @@
       (u/arity-error t1 t2))
     (u/unification-failure t1 t2)))
 
+(defn unify-coll [coll]
+  (reduce (fn [s [a b]] (compose (unify a b) s)) id (partition 2 1 coll)))
+
+(p/defn rewrite-row
+  ([l t [RowEmpty _]]
+   (throw (Exception. (format "Row does not contain label %s" l))))
+
+  ([l t [Row l' t' tail] | (= l l')]
+   [(trampoline unify t t') tail])
+
+  ([l t [Row l' t' tail]]
+   (let [[s tail'] (rewrite-row l t tail)]
+     [s (Row. l' t' tail')]))
+
+  ([l t [Var a]] ; this is the case where r is a tv
+   (let [row (Row. l t (Var. a))]
+     [(t/sub {a row}) row]))
+
+  ([_ _ x]
+   (throw (Exception. (format "Expected row type, got %s" (pr-str x))))))
+
 (p/defn unify
   ([[Arrow l r :as t1] [Arrow l' r' :as t2]] (unify-arrow l l' r r'))
 
@@ -65,5 +86,16 @@
 
   ([[Container tag1 t1-args :as t1] [Container tag2 t2-args :as t2]]
    (unify-compound t1 tag1 t1-args t2 tag2 t2-args))
+
+  ([[RowEmpty _] [RowEmpty _]] id)
+
+  ([[Row k v tail :as row] [Row _ :as row']]
+   ;; side ^^ condition needed here on tail before rewrite
+   ;; must not already be bound (by bind)
+   (let [[s row''] (rewrite-row k v row')]
+     (compose (unify (t/substitute tail s) row'') s)))
+
+  ([[Record row] [Record row']]
+   (unify row row'))
 
   ([t1 t2] (u/unification-failure t1 t2)))

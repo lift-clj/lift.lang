@@ -1,5 +1,7 @@
 (ns lift.lang.prim
-  (:require [lift.lang.type :as t]))
+  (:require [lift.lang.type :as t])
+  (:import
+   [clojure.lang Keyword Ratio Symbol]))
 
 (t/def =Character (Character -> Character -> Boolean))
 (defn =Character [^Character x ^Character y] (.equals x y))
@@ -25,3 +27,26 @@
 (def eq =)
 
 (t/def t/unmatched-case-error (a -> b))
+
+(t/def nameKeyword (Keyword -> String))
+(def nameKeyword name)
+
+(t/def nameSymbol (Symbol -> String))
+(def nameSymbol name)
+
+(t/def +Long     (Long -> Long -> Long))
+(defn  +Long     [x y] (+ x y))
+(t/def *Long     (Long -> Long -> Long))
+(defn  *Long     [x y] (* x y))
+(t/def -Long     (Long -> Long -> Long))
+(defn  -Long     [x y] (- x y))
+(t/def divLong   (Long -> Long -> Ratio))
+(defn  divLong   [x y] (/ x y))
+(t/def +Double   (Double -> Double -> Double))
+(defn  +Double   [x y] (+ x y))
+(t/def *Double   (Double -> Double -> Double))
+(defn  *Double   [x y] (* x y))
+(t/def -Double   (Double -> Double -> Double))
+(defn  -Double   [x y] (- x y))
+(t/def divDouble (Double -> Double -> Double))
+(defn  divDouble [x y] (/ x y))

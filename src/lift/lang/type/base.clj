@@ -6,7 +6,8 @@
    [lift.f.functor :as f :refer [Functor]]
    [lift.lang.type.impl :as impl :refer [cata Show]])
   (:import
-   [clojure.lang IFn ILookup IPersistentMap]))
+   [clojure.lang IFn ILookup IPersistentMap]
+   [lift.lang.type.impl Type]))
 
 (defprotocol Ftv (-ftv [x]))
 
@@ -75,16 +76,20 @@
            (name tag))))
 
 (impl/deftype (RowEmpty)
-  Ftv  (-ftv [_] #{})
+  Ftv  (-ftv  [_] #{})
   Show (-show [_] "{}"))
 
 (impl/deftype (Row k v tail)
-  Ftv  (-ftv [_] (union v tail))
-  Show (-show [_] (format "%s : %s, %s" k v tail)))
+  Functor (-map  [_ f] (Row. k (f v) (f tail)))
+  Ftv     (-ftv  [_]   (union v tail))
+  Show    (-show [_]   (format "%s : %s, %s" (pr-str k) v tail)))
 
 (impl/deftype (Record row)
-  Ftv  (-ftv [_] (ftv row))
+  Ftv  (-ftv  [_] row)
   Show (-show [x] (format "{%s}" row)))
+
+(impl/deftype (Select l r)
+  Show (-show [_] (format "(%s %s)" l r)))
 
 (impl/deftype (Vector xs)
   Functor (-map  [_ f] (Vector. (f/-map xs f)))
@@ -110,6 +115,10 @@
   Functor (-map [x _] x)
   Show    (-show [_] (name a)))
 
+(impl/deftype (Key k)
+  Functor (-map  [x _] x)
+  Show    (-show [_]   (str k)))
+
 (impl/deftype (Lambda x e)
   Show (-show [_] (format "(fn [%s] %s)" (impl/-show x) e)))
 
@@ -133,7 +142,9 @@
 (impl/deftype (SyntaxNode n t)
   Functor (-map  [_ f] (SyntaxNode. (f n) t))
   Show    (-show [_]
-            (str (if (instance? lift.lang.type.impl.Type n) n (pr-str n))
+            (str (cond (instance? Type n) n
+                       (string? n) n
+                       :else (pr-str n))
                  (when t (str " : " (pr-str t)))))
   Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s))))
 
@@ -168,14 +179,17 @@
   Show
   (-show [_] (format "S[%s]" s)))
 
+(defn $ [expr type]
+  (SyntaxNode. expr type))
+
 (defmacro import-container-types []
-  `(do (import ~@`[Container RowEmpty Row Record Vector Map Tuple]) nil))
+  `(do (import ~@`[Container RowEmpty Row Record Select Vector Map Tuple]) nil))
 
 (defmacro import-infer-types []
   `(do (import ~@`[Env Substitution]) nil))
 
 (defmacro import-syntax-types []
-  `(do (import ~@`[Literal Symbol Lambda Apply Let If Prim SyntaxNode Curry]) nil))
+  `(do (import ~@`[Literal Symbol Key Lambda Apply Let If Prim SyntaxNode Curry]) nil))
 
 (defmacro import-type-types []
   (let [types `[Unit Const Var Vargs Arrow Forall Predicate Predicated New]]

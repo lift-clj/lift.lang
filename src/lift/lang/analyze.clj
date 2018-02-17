@@ -7,8 +7,9 @@
    [lift.f.functor :as f]
    [lift.lang.pattern :as p]
    [lift.lang.type :as t]
-   [lift.lang.type.base :as base]
-   [lift.lang.util :refer [resolve-sym]])
+   [lift.lang.type.base :as base :refer [$]]
+   [lift.lang.util :refer [resolve-sym]]
+   [lift.lang.util :as u])
   (:import
    [lift.lang.type.impl Type]))
 
@@ -59,7 +60,9 @@
   (s/and seq? (s/cat :op keyword? :arg ::record-expr)))
 
 (s/def ::record-extension
-  (s/and seq? (s/cat :op #{'assoc} :r ::record-expr :l keyword? :a ::record-expr)))
+  (s/and seq? (s/cat :op #{'assoc}
+                     :r ::record-expr
+                     :kvs (s/+ (s/cat :l keyword? :a ::record-expr)))))
 
 (s/def ::record-restriction
   (s/and seq? (s/cat :op #{'dissoc} :r ::record-expr :l keyword?)))
@@ -169,11 +172,17 @@
 
 (defmethod -parse :Rec [_ expr] (Map. expr))
 
-;; (defmethod -parse :Sel [_ [op arg]]
-;;   (Select. arg (-> (Literal. op) (assoc :type (Const. op)))))
+(defmethod -parse :Sel [_ [op arg]]
+  (Select. op arg))
 
-(defmethod -parse :Ext [_ [op r l a]]
-  (Apply. op [r l a]))
+(defmethod -parse :Ext [_ [op r & kvs]]
+  (reduce (fn [r [l a]]
+            (-> op
+                (Apply. r)
+                (Apply. (Key. l))
+                (Apply. a)))
+          r
+          (partition 2 kvs)))
 
 (defmethod -parse :Res [_ [op r l]]
   (Apply. op [r l]))

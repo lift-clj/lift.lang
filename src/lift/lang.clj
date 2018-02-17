@@ -1,5 +1,5 @@
 (ns lift.lang
-  (:refer-clojure :exclude [case defn read = not=])
+  (:refer-clojure :exclude [+ * - / case defn name read = not=])
   (:require
    [lift.lang.case :as case]
    [lift.lang.defn :as defn]
@@ -7,6 +7,26 @@
    [lift.lang.prim :as prim]
    [lift.lang.type :as type]
    [lift.lang.type.data :as data]))
+
+(type/def not       (Boolean -> Boolean))
+(type/def instance? (Class -> a -> Boolean))
+(type/def inc       (Long -> Long))
+(type/def pos?      (Long -> Boolean))
+(type/def str       (a -> String))
+;; (type/def nth       (Vector a -> Long -> a))
+(type/def double    (Ratio -> Double))
+(type/def list      (List a))
+(type/def cons      (a -> (List a) -> (List a)))
+(type/def first     ((List a) -> a))
+(type/def vector    (Vector a))
+(type/def conj      (Vector a -> a -> Vector a))
+(type/def map.      {})
+(type/def get       ({l a | r} -> l -> a))
+(type/def assoc     ({| r} -> l -> a -> {l a | r}))
+(type/def dissoc    ({l a | r} -> l ->  {| r}))
+(type/def keyword   (String -> Keyword))
+(type/def reverse   (List a -> List a))
+(type/def map       ((a -> b) -> (List a) -> (List b)))
 
 (defmacro data
   {:style/indent :defn}
@@ -33,9 +53,6 @@
 (data Maybe a = Just a | Nothing)
 (data Either a b = Left a | Right b)
 (data Pair a b = Pair a b)
-
-(type/def not (Boolean -> Boolean))
-(type/def instance? (Class -> a -> Boolean))
 
 (interface (Eq a)
   (=    (a -> a -> Boolean))
@@ -78,3 +95,36 @@
 
 (impl (Coercible String Long)
   (coerce [a] (read a)))
+
+(interface (Named a)
+  (name (a -> String)))
+
+(impl (Named Keyword)
+  (name [a] (prim/nameKeyword a)))
+
+(impl (Named Symbol)
+  (name [a] (prim/nameSymbol a)))
+
+(interface (Num a)
+  (+ (a -> a -> a))
+  (* (a -> a -> a))
+  (- (a -> a -> a)))
+
+(impl (Num Long)
+  (+ [x y] (prim/+Long x y))
+  (* [x y] (prim/*Long x y))
+  (- [x y] (prim/-Long x y)))
+
+(impl (Num Double)
+  (+ [x y] (prim/+Double x y))
+  (* [x y] (prim/*Double x y))
+  (- [x y] (prim/-Double x y)))
+
+(interface (Div a b)
+  (/ (a -> a -> b)))
+
+(impl (Div Long Ratio)
+  (/ [x y] (prim/divLong x y)))
+
+(impl (Div Double Double)
+  (/ [x y] (prim/divDouble x y)))

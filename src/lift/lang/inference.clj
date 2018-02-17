@@ -5,13 +5,14 @@
    [lift.lang.unification :refer [compose unify]]
    [lift.lang.util :as u]
    [lift.lang.type :as t :refer [id]]
-   [lift.lang.type.base :as base]
+   [lift.lang.type.base :as base :refer [$]]
    [lift.lang.type.impl :refer [cata hylo -vec]]
    [lift.lang.analyze :as ana]
    [clojure.set :as set])
   (:import
    [clojure.lang Fn]))
 
+(base/import-container-types)
 (base/import-type-types)
 (base/import-syntax-types)
 
@@ -83,9 +84,6 @@
           t  (f/map un t)]
       (if ts (Predicated. ts t) t))))
 
-(defn $ [expr type]
-  (SyntaxNode. expr type))
-
 (p/defn -infer
   ([_Gamma [Literal _ :as expr]] [id ($ expr (ana/type expr))])
 
@@ -100,11 +98,14 @@
          [p2 t2] (release (t/substitute tv s))]
      [s ($ (Lambda. (Symbol. a) e) (with-pred _Gamma [p1 p2] (Arrow. t2 t1)))]))
 
+  ([_Gamma [Key k]] [id ($ (Key. k) (Const. k))])
+
   ([_Gamma [Apply e1 e2]]
    (let [tv (Var. (gensym 'ξ))
          [s1 [_ t1 :as e1]] (e1 _Gamma)
          [s2 [_ t2 :as e2]] (e2 (t/substitute _Gamma s1))
          [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
+     (prn t1 t2)
      [(compose s3 s2 s1)
       ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))]))
 
@@ -121,6 +122,28 @@
           s4 (unify t1 (Const. 'Boolean))
           s5 (unify t2 t3)]
       [(compose s5 s4 s3 s2 s1) ($ (If. cond then else) (t/substitute t2 s5))]))
+
+  ([_Gamma [Select label rec]]
+   (let [t1 (Const. label)
+         vtype (Var. (gensym 'v))
+         btype (Var. (gensym 'b))
+         rectype (Record. (Row. t1 vtype btype))
+         [s2 [_ t2 :as r]] (rec _Gamma)
+         s3 (unify rectype t2)]
+     [(compose s3 s2) ($ (Select. label r) (t/substitute vtype s3))]))
+
+  ([_Gamma [Map m]]
+   (let [[s1 vals] (reduce (fn [[s2 es] e]
+                             (let [[s3 e'] (e _Gamma)]
+                               [(compose s3 s2) (conj es e')]))
+                           [id []]
+                           (vals m))
+          keys (keys m)
+          labels (map #(Const. %) keys)
+          t (Record. (reduce (fn [row [k v]] (Row. k v row))
+                                (RowEmpty.)
+                                (map vector labels (map :t vals))))]
+      [s1 ($ (Map. (into {} (map vector keys vals))) t)]))
 
   ([_Gamma [Prim f t]] [id (Prim. f (instantiate t))])
 

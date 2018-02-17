@@ -27,7 +27,7 @@
   Object
   (-show [x] x)
   IPersistentMap
-  (-show [x] (->> (map (fn [[k v]] (str (show k) " " v)) x) (string/join ", "))))
+  (-show [x] (pr-str x)))
 
 
 (defn ->sym [x]

@@ -75,7 +75,6 @@
       {:type :ltrl :ltrl m :thex x :expr e})))
 
 (defn case-tree [n x m e l]
-  (prn m)
   (let [t (:type n)]
     (cond (tupl? m)
           (case-tree n x (tuple m) e l)
@@ -113,8 +112,6 @@
           (update n :else default-case default)
           n)))))
 
-(def emit-case nil)
-;; (defmulti emit-case (fn [x] (prn x) (:type x)))
 (defmulti emit-case :type)
 
 (defmethod emit-case :dest [{:keys [test thex prjs then else]}]
