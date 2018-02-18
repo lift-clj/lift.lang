@@ -91,8 +91,7 @@
     (let [code (u/macroexpand-all expr)
           [s [_ t err :as expr]] (check code)]
       (if err
-        (throw
-         (Exception. (str (pr-str expr) "\n" (string/join "\n" err))))
+        (throw (Exception. (str (pr-str expr) "\n" (string/join "\n" err))))
         (let [ftvs (base/ftv t)
               sub  (sub-pretty-vars ftvs)
               ret  (->> expr
@@ -144,7 +143,9 @@
   (and (map? x) (contains? x ::op)))
 
 (defn type-of-expr-at-point [{:keys [file top expr]}]
-  (rdr/top-level-sexp file (first top)))
+  (let [expr (apply rdr/top-level-sexp file (first top) expr)]
+    expr
+    ))
 
 (defn run-op [msg]
   ((ns-resolve 'lift.middleware (::op msg)) msg))

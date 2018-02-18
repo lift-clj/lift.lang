@@ -5,42 +5,61 @@
    [clojure.java.io :as io]
    [clojure.string :as string]))
 
-(deftype CharCountingPushbackReader
-    [rdr ^:unsynchronized-mutable ^long column file-name]
+(deftype SyntaxMarkingPushbackReader
+    [rdr
+     ^:unsynchronized-mutable mark-line
+     ^:unsynchronized-mutable mark-col
+     ^:unsynchronized-mutable mark
+     ^:unsynchronized-mutable buf]
   rt/Reader
   (rt/read-char [reader]
-    (when-let [ch (rt/read-char rdr)]
-      (set! column (inc column))
-      ch))
-  (rt/peek-char [reader]
-    (rt/peek-char rdr))
+    (let [line (rt/get-line-number rdr)
+          col  (rt/get-column-number rdr)]
+      (cond
+        (and mark-line (= mark-line line) (= mark-col col))
+        (do
+          (set! mark-line nil)
+          (set! mark "mark ")
+          \#)
+        (seq mark)
+        (let [ch (first mark)]
+          (set! mark (subs mark 1))
+          ch)
+        :else
+        (rt/read-char rdr))))
+  (rt/peek-char [reader] (rt/peek-char rdr))
   rt/IPushbackReader
   (rt/unread [reader ch]
-    (set! column (dec column))
-    (rt/unread rdr ch))
+    (if (seq mark)
+      (set! mark (str ch mark))
+      (rt/unread rdr ch)))
   rt/IndexingReader
-  (rt/get-line-number [reader] 0)
-  (rt/get-column-number [reader] (int column))
-  (rt/get-file-name [reader] file-name)
+  (rt/get-line-number [reader] (rt/get-line-number rdr))
+  (rt/get-column-number [reader] (rt/get-column-number rdr))
+  (rt/get-file-name [reader] (rt/get-file-name rdr))
   java.io.Closeable
   (close [this]
     (when (instance? java.io.Closeable rdr)
       (.close ^java.io.Closeable rdr))))
 
-(defn ^java.io.Closeable char-counting-push-back-reader
-  "Creates an IndexingPushbackReader from a given string or PushbackReader"
-  ([s-or-rdr]
-   (char-counting-push-back-reader s-or-rdr 1))
-  ([s-or-rdr buf-len]
-   (char-counting-push-back-reader s-or-rdr buf-len nil))
-  ([s-or-rdr buf-len file-name]
-   (CharCountingPushbackReader.
-    (to-pbr s-or-rdr buf-len) 1 file-name)))
+(defn ^java.io.Closeable syntax-marking-push-back-reader
+  ([rdr mark-line mark-col]
+   (SyntaxMarkingPushbackReader. rdr mark-line mark-col nil nil)))
+
+;; (with-open [r (-> "test 1 2"
+;;             (java.io.StringReader.)
+;;             (rt/indexing-push-back-reader)
+;;             (syntax-marking-push-back-reader 1 6))]
+;;   (binding [r/*data-readers* {'mark (fn [x] `(mark ~x))}]
+;;     (r/read r)
+;;     (r/read r))
+;;   )
 
 (defn read-with-meta [{:keys [start end expr] :as expr-info}]
   {:start 1
    :end   (inc (- end start))
-   :expr  (-> expr char-counting-push-back-reader r/read)})
+   :expr  nil ;(-> expr char-counting-push-back-reader r/read)
+   })
 
 (defn unify-position [expr topx]
   (let [start-expr (:start expr)
@@ -60,7 +79,11 @@
     (do (rt/read-line r) (recur (dec n) r))
     r))
 
-(defn top-level-sexp [file line]
-  (with-open [r (rt/indexing-push-back-reader (io/reader (io/file file)))]
+(defn top-level-sexp [file line mark-line mark-col]
+  (with-open [r (-> (io/file file)
+                    (io/reader)
+                    (rt/indexing-push-back-reader)
+                    (syntax-marking-push-back-reader mark-line mark-col))]
     (drop-lines (dec line) r)
-    (r/read r)))
+    (binding [r/*data-readers* {'mark (fn [x] `(mark ~x))}]
+      (r/read r))))
