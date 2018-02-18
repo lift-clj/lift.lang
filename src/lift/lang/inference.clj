@@ -39,7 +39,7 @@
     (throw (Exception. ("Cannot take symhead of non-symbol " s)))))
 
 (defn instantiate [[as t :as x]]
-  (let [vars  (map (comp #(Var. %) gensym symhead) as)
+  (let [vars  (mapv (comp #(Var. %) gensym symhead) as)
         subst (t/sub (zipmap as vars))]
     (t/substitute t subst)))
 

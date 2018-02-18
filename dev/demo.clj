@@ -95,11 +95,9 @@
 (defn with-vat [x]
   (* (+ 1.0 VAT) x))
 
-;; (/ 100 20)
-
-;; (defn add-final-total [rental-pricing]
-;;   (assoc rental-pricing
-;;          :total (with-vat (:ex-vat-total rental-pricing))))
+(defn add-final-total [rental-pricing]
+  (assoc rental-pricing
+         :total (with-vat (:ex-vat-total rental-pricing))))
 
 ;; ;; What's the type of `add-final-total`?
 
@@ -107,8 +105,8 @@
 
 ;; ;; I haven't written any types
 
-;; (let [x {:ex-vat-total 500}]
-;;   (add-final-total x))
+(let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
+  (add-final-total x))
 
 
 ;; Testing out different syntax elements, inspect types
@@ -128,7 +126,7 @@
 
 ;; ;; Tells you things about your data (\space t e)
 
-;; (deep-map-returning-fn 1142)
+(deep-map-returning-fn 1142)
 
 ;; (:a (deep-map-returning-fn 1142))
 

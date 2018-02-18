@@ -66,7 +66,6 @@
    [(trampoline unify t t') tail])
 
   ([l t [Row l' t' tail]]
-   (prn l t l' t' tail)
    (let [[s tail'] (rewrite-row l t tail)]
      [s (Row. l' t' tail')]))
 

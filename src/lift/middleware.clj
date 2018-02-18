@@ -18,7 +18,7 @@
    [lift.lang.analyze :as ana]
    [lift.lang.type.impl :as impl])
   (:import
-   [lift.lang.type.base SyntaxNode Var]))
+   [lift.lang.type.base Forall SyntaxNode Var]))
 
 (defn read-colon [reader initch opts pending-forms]
   (let [ch (read-char reader)]
@@ -67,23 +67,33 @@
   ([expr] (check @type/type-env expr))
   ([env expr]
    (let [[s ast] ((impl/hylo infer/-infer-ann-err ana/parse expr) env)]
-     (prn 'ast ast (nth ast 2))
      [s (type/substitute ast s)])))
+
+(defn def? [expr]
+  (and (seq? expr) (= 'def (first expr))))
 
 (defn lift [expr]
   (try
-    (let [[s [_ t err :as expr]] (-> expr u/macroexpand-all check)]
+    (let [code (u/macroexpand-all expr)
+          [s [_ t err :as expr]] (check code)]
       (if err
         (throw
          (Exception. (str (pr-str expr) "\n"
                           (string/join "\n" err))))
         (let [ftvs (base/ftv t)
-              sub  (sub-pretty-vars ftvs)]
-          (->> expr
-               (rewrite/rewrite @type/type-env s)
-               (rewrite/emit)
-               (c/eval)
-               (#(SyntaxNode. % (type/substitute t sub) nil))))))))
+              sub  (sub-pretty-vars ftvs)
+              ret  (->> expr
+                        (rewrite/rewrite @type/type-env s)
+                        (rewrite/emit))
+              t'   (type/substitute t sub)]
+          (if (def? code)
+            (let [name (second code)]
+              (c/eval (list 'def name ret))
+              (let [v (u/resolve-sym name)
+                    sigma (Forall. (base/ftv t') t')]
+                (swap! type/type-env assoc v sigma)
+                (SyntaxNode. (resolve v) t' nil)))
+            (SyntaxNode. (c/eval ret) t' nil)))))))
 
 (defn eval-handler [handler {:keys [ns code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))]
