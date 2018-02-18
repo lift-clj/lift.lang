@@ -61,6 +61,6 @@
     r))
 
 (defn top-level-sexp [file line]
-  (with-open [r (rt/indexing-push-back-reader (io/reader (io/resource file)))]
+  (with-open [r (rt/indexing-push-back-reader (io/reader (io/file file)))]
     (drop-lines (dec line) r)
     (r/read r)))

@@ -205,5 +205,4 @@
           (= :Def (first conformed))
           (ana parse (nth expr 2))
           :default
-          (-parse (first conformed) expr)
-)))
+          ($ (-parse (first conformed) expr) nil nil (meta expr)))))

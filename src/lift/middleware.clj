@@ -89,12 +89,10 @@
 (defn lift [expr]
   (try
     (let [code (u/macroexpand-all expr)
-          _ (prn code)
           [s [_ t err :as expr]] (check code)]
       (if err
         (throw
-         (Exception. (str (pr-str expr) "\n"
-                          (string/join "\n" err))))
+         (Exception. (str (pr-str expr) "\n" (string/join "\n" err))))
         (let [ftvs (base/ftv t)
               sub  (sub-pretty-vars ftvs)
               ret  (->> expr
@@ -142,15 +140,26 @@
 ;;               (catch Throwable t t)))))))
 
 
+(defn control? [x]
+  (and (map? x) (contains? x ::op)))
+
+(defn type-of-expr-at-point [{:keys [file top expr]}]
+  (rdr/top-level-sexp file (first top)))
+
+(defn run-op [msg]
+  ((ns-resolve 'lift.middleware (::op msg)) msg))
+
 (defn eval-handler [handler {:keys [op ns code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
-        eval  (case op "eval" `lift "type" prn c/eval)]
-    (if lift?
-      (handler (assoc msg :eval eval))
-      (handler msg))))
+        code  (r/read-string code)]
+    (if (control? code)
+      (handler (assoc msg :eval `identity :code (list 'quote (run-op code))))
+      (let [eval  (case op "eval" `lift "type" prn c/eval)]
+        (if lift?
+          (handler (assoc msg :eval eval))
+          (handler msg))))))
 
 (defn repl-fn [handler {:keys [op code ns file column line] :as msg}]
-  ;; (prn op file column line)
   (cond
     (= "load-file" op) (eval-handler handler msg)
     (= "eval" op)      (eval-handler handler msg)

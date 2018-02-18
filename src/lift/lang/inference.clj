@@ -186,14 +186,15 @@
 
   ([_Gamma [Prim f t]] [id (Prim. f (instantiate t))])
 
+  ([_Gamma [SyntaxNode n t e m]]
+   (let [[s1 [e1 t1]] (n _Gamma)] [s1 (base/$ e1 t1 e m)]))
+
   ([_ x]
    (throw (Exception. (str "Unrecognized syntax: " (pr-str x))))))
 
 (defn infer [_Gamma expr]
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
-
-(impl/deftype (Infer syn err))
 
 (defn -infer-ann-err [x]
   (fn [env]
