@@ -32,8 +32,13 @@
       (let [a' (u/resolve-sym a)] (if-let [t (get _Gamma a')] [a' t]))
       (u/unbound-variable-error a)))
 
+(defn symhead [s]
+  (if (symbol? s)
+    (symbol (str (first (name s))))
+    (throw (Exception. ("Cannot take symhead of non-symbol " s)))))
+
 (defn instantiate [[as t :as x]]
-  (let [vars  (map (comp #(Var. %) gensym) as)
+  (let [vars  (map (comp #(Var. %) gensym symhead) as)
         subst (t/sub (zipmap as vars))]
     (t/substitute t subst)))
 
@@ -50,22 +55,37 @@
    (every? #(instance? Const %) as))
   ([_] false))
 
+(defn concrete-instance [[tag as]]
+  (Predicate. tag (mapv (comp #(Const. %) symbol name :tag) as))
+  ;; TODO: ^^ this should be ns qualified
+  )
+
 (defn release? [_Gamma p]
-  (or (nil? p)
-      (contains? _Gamma p)
-      (and (not (concrete-instance? p))
-           (assume? p))
-      (throw (Exception. (format "No instance of %s in Γ" (pr-str p))))))
+  (let [p (concrete-instance p)]
+    (or (nil? p)
+        (contains? _Gamma p)
+        (and (not (concrete-instance? p))
+             (assume? p))
+        (throw (Exception. (format "No instance of %s in Γ" (pr-str p)))))))
 
 (defn with-pred [_Gamma preds t]
-  (let [shed (partial remove #(or (nil? %) (contains? _Gamma %)))]
-    (or (some-> preds flatten shed distinct seq (Predicated. t))
-        t)))
+  (if (instance? Const t)
+    t
+    (let [shed (partial remove #(or (nil? %) (contains? _Gamma %)))]
+      (or (some-> preds flatten shed distinct seq (Predicated. t))
+          t))))
 
 (p/defn split-pred
   ([[Predicate tag [Predicated [[Predicate _ as :as p]]]]]
    [(Predicate. tag as) p])
   ([p] [p]))
+
+(defn hoist [t]
+  (letfn [(ps [x] (when (instance? Predicated x) (:preds x)))
+          (un [x] (if (instance? Predicated x) (:t x) x))]
+    (let [ts (->> t -vec (mapcat ps) (remove nil?) distinct seq)
+          t  (f/map un t)]
+      (if ts (Predicated. ts t) t))))
 
 (defn rel-unify [_Gamma a b]
   (let [[[pa ta] [pb tb]] (map release [a b])
@@ -76,13 +96,6 @@
                 (distinct))]
     (every? (partial release? _Gamma) ps)
     [s ps]))
-
-(defn hoist [t]
-  (letfn [(ps [x] (when (instance? Predicated x) (:preds x)))
-          (un [x] (if (instance? Predicated x) (:t x) x))]
-    (let [ts (->> t -vec (mapcat ps) (remove nil?) distinct seq)
-          t  (f/map un t)]
-      (if ts (Predicated. ts t) t))))
 
 (p/defn -infer
   ([_Gamma [Literal _ :as expr]] [id ($ expr (ana/type expr))])
@@ -118,9 +131,11 @@
     (let [[s1 [_ t1 :as cond]] (cond _Gamma)
           [s2 [_ t2 :as then]] (then _Gamma)
           [s3 [_ t3 :as else]] (else _Gamma)
-          s4 (unify t1 (Const. 'Boolean))
-          s5 (unify t2 t3)]
-      [(compose s5 s4 s3 s2 s1) ($ (If. cond then else) (t/substitute t2 s5))]))
+          [s4 p1] (rel-unify _Gamma t1 (Const. 'Boolean))
+          [s5 p2] (rel-unify _Gamma t2 t3)]
+      [(compose s5 s4 s3 s2 s1)
+       ($ (If. cond then else)
+          (with-pred _Gamma (concat p1 p2) (t/substitute t2 s5)))]))
 
   ([_Gamma [Select label rec]]
    (let [t1 (Const. label)
@@ -160,7 +175,7 @@
       (catch clojure.lang.ExceptionInfo e
         (let [d (ex-data e)]
           (throw
-           (ex-info (str "Inference failure: " (-> d :cause :cause))
+           (ex-info (str "Inference failure: " (-> d :cause))
                     {:x x :next d}))))
       (catch Throwable t
         (throw

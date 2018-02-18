@@ -8,6 +8,7 @@
    [lift.lang.pattern :as p]
    [lift.lang.type :as t]
    [lift.lang.type.base :as base :refer [$]]
+   [lift.lang.type.impl :refer [ana]]
    [lift.lang.util :refer [resolve-sym]]
    [lift.lang.util :as u])
   (:import
@@ -34,6 +35,9 @@
         :Symbol   symbol?
         :Keyword  keyword?
         :Char     char?))
+
+(defn literal? [x]
+  (s/valid? ::literal x))
 
 (s/def ::def
   (s/and seq? #(= 'def (first %)) (s/coll-of any?)))
@@ -185,15 +189,18 @@
           (partition 2 kvs)))
 
 (defmethod -parse :Res [_ [op r l]]
-  (Apply. op [r l]))
+  (-> op (Apply. r) (Apply. l)))
 
 (defmethod -parse :Fun [_ f] f)
 
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
-    (if (s/invalid? conformed)
-      (if (instance? Type expr)
-        expr
-        (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
-                        (s/explain-data ::expr expr))))
-      (-parse (first conformed) expr))))
+    (cond (s/invalid? conformed)
+          (if (instance? Type expr)
+            expr
+            (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
+                            (s/explain-data ::expr expr))))
+          (= :Def (first conformed))
+          (ana parse (nth expr 2))
+          :else
+          (-parse (first conformed) expr))))

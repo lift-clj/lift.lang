@@ -1,7 +1,7 @@
 (ns lift.lang.rewrite
   (:require
    [lift.f.functor :as f]
-   [lift.lang.inference :refer [infer]]
+   [lift.lang.inference :as infer :refer [infer]]
    [lift.lang.pattern :as p]
    [lift.lang.type.base :as base]
    [lift.lang.util :as u]
@@ -19,13 +19,23 @@
 (extend-protocol f/Functor
   clojure.lang.Fn (-map [x f] x))
 
+(p/defn concrete-instance?
+  ([[Predicate _ as :as p]]
+   (every? concrete-instance? as))
+  ([[Container tag args]]
+   (every? concrete-instance? args))
+  ([[Const _]] true)
+  ([_] false))
+
 (p/defn -rewrite
   ([_Gamma [SyntaxNode
        [Symbol f]
        [Predicated [[Predicate _ as :as p]] [Arrow :as t]] :as syn]]
-   (if (every? #(instance? Const %) as)
-     (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma)))
-     syn))
+   (prn 'xxx p (concrete-instance? p))
+   (if (concrete-instance? p)
+     (let [p (infer/concrete-instance p)]
+       (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma)))
+       f)))
   ([_ [SyntaxNode [Apply [Lambda :as e1] e2] [Arrow _]]]
    (Apply. e1 e2))
   ([_ [SyntaxNode [Apply e1 e2] [Arrow _]]]

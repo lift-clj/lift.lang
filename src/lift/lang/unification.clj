@@ -60,7 +60,7 @@
 
 (p/defn rewrite-row
   ([l t [RowEmpty _]]
-   (throw (Exception. (format "Row does not contain label %s" l))))
+   (throw (Exception. (format "Row does not contain label %s" (pr-str l)))))
 
   ([l t [Row l' t' tail] | (= l l')]
    [(trampoline unify t t') tail])

@@ -5,6 +5,7 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [lift.lang.analyze :as ana]
+   [lift.lang.defn :as defn]
    [lift.lang.inference :as infer :refer [check rel-unify]]
    [lift.lang.pattern :as p]
    [lift.lang.type :as t]
@@ -12,7 +13,7 @@
    [lift.lang.type.impl :as impl]
    [lift.lang.unification :refer [unify]]
    [lift.lang.util :as u]
-   [riddley.walk :as walk]))
+   [lift.lang.case :as case]))
 
 (base/import-syntax-types)
 (base/import-type-types)
@@ -202,28 +203,55 @@
 ;;         ])
 ;;   )
 
-(defn impl [pred sub impls]
-  (letfn [(f [{:keys [f arglist expr]}]
-            (let [f       (u/resolve-sym f)
-                  _Gamma       (assoc @t/type-env pred ::temp)
-                  code    (walk/macroexpand-all (list 'fn arglist expr))
-                  [e t]   (check code)
-                  [as pt] (get _Gamma f)
-                  _ (assert pt (format "Symbol %s not found in env" f))
-                  [ps t'] pt
-                  _ (assert t')
-                  [s p]   (rel-unify _Gamma t (t/substitute t' sub))
-                  [_ t]   (infer/release t)]
-              (t/substitute (SyntaxNode. e t) s)))]
-    (let [c (u/assert-conform (s/coll-of ::default-impl) impls)]
-      (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c)))))
+(defn default-impl [pred sub {:keys [f arglist expr]}]
+  (let [f       (u/resolve-sym f)
+        _Gamma       (assoc @t/type-env pred ::temp)
+        code    (u/macroexpand-all (list 'fn arglist expr))
+        [e t]   (check code)
+        [as pt] (get _Gamma f)
+        _ (assert pt (format "Symbol %s not found in env" f))
+        [ps t'] pt
+        _ (assert t')
+        [s p]   (rel-unify _Gamma t (t/substitute t' sub))
+        [_ t]   (infer/release t)]
+    (t/substitute (SyntaxNode. e t) s)))
 
-;; (s/conform
-;;  ::match-impl
-;;  '(=
-;;    ([[Just x] [Just y]] (= x y))
-;;    ([Nothing   Nothing] True)
-;;    ([_         _      ] False)))
+(defn match-impl [pred sub {:keys [f impls]}]
+  (let [n       (count (:arglist (first impls)))
+        vs      (defn/vars n)
+        f       (u/resolve-sym f)
+        _Gamma       (assoc @t/type-env pred ::temp)
+        code    `(fn [~@vs]
+                   ~(case/case*
+                     (case/tuple n vs)
+                     (mapcat (fn [{:keys [arglist expr]}]
+                               `[~(case/tuple n arglist) ~expr])
+                             impls)))
+        code    (u/macroexpand-all code)
+        [e t]   (check code)
+        [as pt] (get _Gamma f)
+        _ (assert pt (format "Symbol %s not found in env" f))
+        [ps t'] pt
+        _ (assert t')
+        [s p]   (rel-unify _Gamma t (t/substitute t' sub))
+        [_ t]   (infer/release t)]
+    (t/substitute (SyntaxNode. e t) s)))
+
+(s/conform
+ ::match-impl
+ '(=
+   ([(Just x) (Just y)] (= x y))
+   ([Nothing   Nothing] True)
+   ([_         _      ] False)))
+
+(defn impl [pred sub impls]
+  (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)
+                                      :match   (s/coll-of ::match-impl))
+                                impls)
+        f     (case t
+                :default (partial default-impl pred sub)
+                :match   (partial match-impl pred sub))]
+    (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
 
 (defn arrseq [f]
   (if (instance? Arrow f)

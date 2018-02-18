@@ -34,7 +34,7 @@
 (impl/deftype (Const x)
   Functor (-map  [x _] x)
   Ftv     (-ftv  [_]   #{})
-  Show    (-show [_]   (name x)))
+  Show    (-show [_]   (str x)))
 
 (impl/deftype (Var a)
   Functor (-map  [x _] x)
@@ -80,10 +80,9 @@
   Show (-show [_] "{}"))
 
 (impl/deftype (Row k v tail)
-  Functor (-map  [_ f] (Row. k (f v) (f tail)))
+  Functor (-map  [_ f] (Row. (f k) (f v) (f tail)))
   Ftv     (-ftv  [_]   (union v tail))
-  Show    (-show [_]   (format "%s : %s, %s" (pr-str k) v tail))
-  Sub     (-sub  [_ s] (Row. (substitute k s) (v s) (tail s))))
+  Show    (-show [_]   (format "%s : %s, %s" k v tail)))
 
 (impl/deftype (Record row)
   Ftv  (-ftv  [_] row)
@@ -118,7 +117,7 @@
 
 (impl/deftype (Key k)
   Functor (-map  [x _] x)
-  Show    (-show [_]   (str k)))
+  Show    (-show [_]   k))
 
 (impl/deftype (Lambda x e)
   Show (-show [_] (format "(fn [%s] %s)" (impl/-show x) e)))
