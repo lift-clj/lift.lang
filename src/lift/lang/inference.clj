@@ -198,36 +198,10 @@
 (defn -infer-ann-err [x]
   (fn [env]
     (try
-      (let [[s [n t e]] (-infer env x)
-            errs        (remove nil? (mapcat :e (impl/-vec n)))]
-        [s (SyntaxNode. n t (into e errs))])
-      ;; catch clojure.lang.ExceptionInfo e
-      ;; (let [d (ex-data e)]
-      ;;   (throw
-      ;;    (ex-info (str "Inference failure: " (-> d :cause))
-      ;;             {:x x :next d})))
-      (catch Throwable t
-        [id (SyntaxNode. x
-                         (Var. 'err)
-                         [(str "Inference failure: " (.getMessage t))])]
-        (throw t)
-        ))))
-
-(defn -infer-ann-err [x]
-  (fn [env]
-    (try
       (-infer env x)
-      ;; catch clojure.lang.ExceptionInfo e
-      ;; (let [d (ex-data e)]
-      ;;   (throw
-      ;;    (ex-info (str "Inference failure: " (-> d :cause))
-      ;;             {:x x :next d})))
       (catch Throwable t
-        [id (SyntaxNode. x
-                         (Var. 'err)
-                         [(str "Inference failure: " (.getMessage t))])]
-        (throw t)
-        ))))
+        ;; [id (base/$ x (Var. 'err) [(str "Inference failure: " (.getMessage t))])]
+        (throw t)))))
 
 (defn check
   ([expr] (check @t/type-env expr))

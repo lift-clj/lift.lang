@@ -89,6 +89,7 @@
 (defn lift [expr]
   (try
     (let [code (u/macroexpand-all expr)
+          _ (prn code)
           [s [_ t err :as expr]] (check code)]
       (if err
         (throw
@@ -106,8 +107,8 @@
               (let [v (u/resolve-sym name)
                     sigma (Forall. (base/ftv t') t')]
                 (swap! type/type-env assoc v sigma)
-                (SyntaxNode. (resolve v) t' nil)))
-            (SyntaxNode. (c/eval ret) t' nil)))))))
+                (base/$ (resolve v) t')))
+            (base/$ (c/eval ret) t')))))))
 
 (defn type-of-symbol [expr]
   (when (symbol? expr) (get @type/type-env (u/resolve-sym expr))))
@@ -115,30 +116,31 @@
 (defn type-of-type [expr]
   (try (get @type/type-env (def/type-signature expr)) (catch Throwable _)))
 
-(defn t [expr-info]
-  (let [{:keys [expr]} (rdr/read-with-meta (:expr expr-info))]
-    (or (type-of-symbol expr)
-        (type-of-type expr)
-        (let [{:keys [expr top-level]} expr-info
-              [expr topx] (rdr/unify-position expr top-level)]
-          (if (= expr topx)
-            (check (u/macroexpand-all (:expr topx)))
-            (try
-              (let [[_ syn] (check (u/macroexpand-all (:expr topx)))]
-                (or (-> t-ast
-                        (type/walk (fn [x]
-                                     (cond (found? expr x)
-                                           (reduced (:type x))
-                                           (and (not (symbol? (:expr x)))
-                                                (= (:expr expr) (:expr x)))
-                                           (reduced (:type x))
-                                           :else
-                                           (if (map? x)
-                                             (first (filter reduced? (vals x)))))))
-                        (unreduced))
-                    (prn 'default)
-                    (:type (typed-ast (:expr expr)))))
-              (catch Throwable t t)))))))
+;; (defn t [expr-info]
+;;   (let [{:keys [expr]} (rdr/read-with-meta (:expr expr-info))]
+;;     (or (type-of-symbol expr)
+;;         (type-of-type expr)
+;;         (let [{:keys [expr top-level]} expr-info
+;;               [expr topx] (rdr/unify-position expr top-level)]
+;;           (if (= expr topx)
+;;             (check (u/macroexpand-all (:expr topx)))
+;;             (try
+;;               (let [[_ syn] (check (u/macroexpand-all (:expr topx)))]
+;;                 (or (-> t-ast
+;;                         (type/walk (fn [x]
+;;                                      (cond (found? expr x)
+;;                                            (reduced (:type x))
+;;                                            (and (not (symbol? (:expr x)))
+;;                                                 (= (:expr expr) (:expr x)))
+;;                                            (reduced (:type x))
+;;                                            :else
+;;                                            (if (map? x)
+;;                                              (first (filter reduced? (vals x)))))))
+;;                         (unreduced))
+;;                     (prn 'default)
+;;                     (:type (typed-ast (:expr expr)))))
+;;               (catch Throwable t t)))))))
+
 
 (defn eval-handler [handler {:keys [op ns code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))

@@ -142,14 +142,14 @@
   IFn     (invoke [_ x] ((eval f) x))
   Show    (-show  [_  ] (name (second f))))
 
-(impl/deftype (SyntaxNode n t e)
-  Functor (-map  [_ f] (SyntaxNode. (f n) t e))
+(impl/deftype (SyntaxNode n t e m)
+  Functor (-map  [_ f] (SyntaxNode. (f n) t e m))
   Show    (-show [_]
             (str (cond (instance? Type n) n
                        (string? n) n
                        :else (pr-str n))
                  (when t (str " : " (pr-str t)))))
-  Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s) e)))
+  Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s) e m)))
 
 (impl/deftype (Curry f)
   Show (-show [_] (format "(Curry %s)" f)))
@@ -182,8 +182,8 @@
   Show
   (-show [_] (format "S[%s]" s)))
 
-(defn $ [expr type & [err]]
-  (SyntaxNode. expr type err))
+(defn $ [expr type & [err meta]]
+  (SyntaxNode. expr type err meta))
 
 (defmacro import-container-types []
   `(do (import ~@`[Container RowEmpty Row Record Restrict Select Vector Map Tuple]) nil))

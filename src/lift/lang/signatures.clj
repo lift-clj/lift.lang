@@ -164,44 +164,7 @@
   (or (try (tuple-arglist t) (catch Throwable _))
       (curried-arglist t)))
 
-(comment
-  (tuple-arglist
-   (Arrow. (Tuple. [(Var. 'a) (Vargs. 'a)]) (Const. 'Bool))))
-
-
-(defn impl-type [type]
-  (parse-type-expr [:type-app (u/assert-conform ::type-app type)]))
-
 (defn q1 [x] (list 'quote x))
-
-(defmulti impl-fn (fn [[impl-type]] impl-type))
-
-;; {:f =,
-;;  :impls
-;;  [{:arglist [[Just x] [Just y]], :expr (= x y)}
-;;   {:arglist [Nothing Nothing], :expr True}
-;;   {:arglist [_ _], :expr False}]}
-
-(defn impls-arglist [[{:keys [arglist]} :as impls]]
-  (assert (reduce = (map (comp count :arglist) impls)))
-  (let [args (mapv (fn [& _] (gensym)) arglist)]
-    `(fn ~args
-       (t/case )
-       )
-    )
-  )
-
-;; (t/case (Just 1)
-;;   [Just x] x
-;;   Nothing 0)
-
-;; (defmethod impl-fn :match-impl [[_ {:keys [f impls]}]]
-;;   (let [f       (u/resolve-sym f)
-;;         _Gamma       (assoc @t/type-env pred ::temp)
-;;         [e t]   (check (list 'fn arglist expr))
-;;         [as pt] (get _Gamma f)
-;;         ])
-;;   )
 
 (defn default-impl [pred sub {:keys [f arglist expr]}]
   (let [f       (u/resolve-sym f)
@@ -214,7 +177,7 @@
         _ (assert t')
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
         [_ t]   (infer/release t)]
-    (t/substitute (SyntaxNode. e t nil) s)))
+    (t/substitute (base/$ e t) s)))
 
 (defn match-impl [pred sub {:keys [f impls]}]
   (let [n       (count (:arglist (first impls)))
@@ -235,7 +198,7 @@
         _ (assert t')
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
         [_ t]   (infer/release t)]
-    (t/substitute (SyntaxNode. e t nil) s)))
+    (t/substitute (base/$ e t) s)))
 
 (defn impl [pred sub impls]
   (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)

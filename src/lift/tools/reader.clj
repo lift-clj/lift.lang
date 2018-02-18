@@ -1,7 +1,9 @@
 (ns lift.tools.reader
   (:require
    [clojure.tools.reader :as r]
-   [clojure.tools.reader.reader-types :as rt :refer [to-pbr]]))
+   [clojure.tools.reader.reader-types :as rt :refer [to-pbr]]
+   [clojure.java.io :as io]
+   [clojure.string :as string]))
 
 (deftype CharCountingPushbackReader
     [rdr ^:unsynchronized-mutable ^long column file-name]
@@ -52,3 +54,13 @@
   (let [node-expr (:expr node)
         {:keys [column end-column] :as m} (meta node-expr)]
     (= expr {:start column :end end-column :expr node-expr})))
+
+(defn drop-lines [n r]
+  (if (pos? n)
+    (do (rt/read-line r) (recur (dec n) r))
+    r))
+
+(defn top-level-sexp [file line]
+  (with-open [r (rt/indexing-push-back-reader (io/reader (io/resource file)))]
+    (drop-lines (dec line) r)
+    (r/read r)))
