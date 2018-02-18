@@ -91,6 +91,9 @@
 (impl/deftype (Select l r)
   Show (-show [_] (format "(%s %s)" l r)))
 
+(impl/deftype (Restrict l r)
+  Show (-show [_] (format "(dissoc %s %s)" r l)))
+
 (impl/deftype (Vector xs)
   Functor (-map  [_ f] (Vector. (f/-map xs f)))
   Ftv     (-ftv  [_]   (set xs))
@@ -139,14 +142,14 @@
   IFn     (invoke [_ x] ((eval f) x))
   Show    (-show  [_  ] (name (second f))))
 
-(impl/deftype (SyntaxNode n t)
-  Functor (-map  [_ f] (SyntaxNode. (f n) t))
+(impl/deftype (SyntaxNode n t e)
+  Functor (-map  [_ f] (SyntaxNode. (f n) t e))
   Show    (-show [_]
             (str (cond (instance? Type n) n
                        (string? n) n
                        :else (pr-str n))
                  (when t (str " : " (pr-str t)))))
-  Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s))))
+  Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s) e)))
 
 (impl/deftype (Curry f)
   Show (-show [_] (format "(Curry %s)" f)))
@@ -179,11 +182,11 @@
   Show
   (-show [_] (format "S[%s]" s)))
 
-(defn $ [expr type]
-  (SyntaxNode. expr type))
+(defn $ [expr type & [err]]
+  (SyntaxNode. expr type err))
 
 (defmacro import-container-types []
-  `(do (import ~@`[Container RowEmpty Row Record Select Vector Map Tuple]) nil))
+  `(do (import ~@`[Container RowEmpty Row Record Restrict Select Vector Map Tuple]) nil))
 
 (defmacro import-infer-types []
   `(do (import ~@`[Env Substitution]) nil))

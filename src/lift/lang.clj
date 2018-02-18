@@ -61,7 +61,6 @@
    (=    [x y] (not (not= x y)))
    (not= [x y] (not (= x y)))))
 
-;; (fn* needs to be added to syntax parsing)
 (impl (Eq Long)
   (= [x y] (prim/=Long x y)))
 

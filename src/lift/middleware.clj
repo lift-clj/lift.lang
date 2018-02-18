@@ -67,21 +67,23 @@
   ([expr] (check @type/type-env expr))
   ([env expr]
    (let [[s ast] ((impl/hylo infer/-infer-ann-err ana/parse expr) env)]
+     (prn 'ast ast (nth ast 2))
      [s (type/substitute ast s)])))
 
 (defn lift [expr]
   (try
-    (let [[s [_ t :as expr]] (-> expr u/macroexpand-all check)
-          ftvs (base/ftv t)
-          sub  (sub-pretty-vars ftvs)]
-      (->> expr
-           (rewrite/rewrite @type/type-env s)
-           (rewrite/emit)
-           (c/eval)
-           (#(SyntaxNode. % (type/substitute t sub)))))
-    (catch clojure.lang.ExceptionInfo e
-      (prn (.getMessage e))
-      e)))
+    (let [[s [_ t err :as expr]] (-> expr u/macroexpand-all check)]
+      (if err
+        (throw
+         (Exception. (str (pr-str expr) "\n"
+                          (string/join "\n" err))))
+        (let [ftvs (base/ftv t)
+              sub  (sub-pretty-vars ftvs)]
+          (->> expr
+               (rewrite/rewrite @type/type-env s)
+               (rewrite/emit)
+               (c/eval)
+               (#(SyntaxNode. % (type/substitute t sub) nil))))))))
 
 (defn eval-handler [handler {:keys [ns code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))]

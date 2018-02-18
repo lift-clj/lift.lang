@@ -8,7 +8,8 @@
    [lift.lang.type.base :as base :refer [$]]
    [lift.lang.type.impl :refer [cata hylo -vec]]
    [lift.lang.analyze :as ana]
-   [clojure.set :as set])
+   [clojure.set :as set]
+   [lift.lang.type.impl :as impl])
   (:import
    [clojure.lang Fn]))
 
@@ -156,9 +157,19 @@
          vtype (Var. (gensym 'v))
          btype (Var. (gensym 'b))
          rectype (Record. (Row. t1 vtype btype))
-         [s2 [_ t2 :as r]] (rec _Gamma)
-         s3 (unify rectype t2)]
-     [(compose s3 s2) ($ (Select. label r) (t/substitute vtype s3))]))
+         [s1 [_ t2 :as r]] (rec _Gamma)
+         s2 (unify rectype t2)]
+     [(compose s2 s1) ($ (Select. label r) (t/substitute vtype s2))]))
+
+  ([_Gamma [Restrict label rec]]
+   (let [t1 (Const. label)
+         vtype (Var. (gensym 'v))
+         btype (Var. (gensym 'b))
+         rectype (Record. (Row. t1 vtype btype))
+         [s1 [_ t2 :as r]] (rec _Gamma)
+         s2 (unify rectype t2)]
+     [(compose s2 s1)
+      ($ (Restrict. label r) (Record. (t/substitute btype s2)))]))
 
   ([_Gamma [Map m]]
    (let [[s1 vals] (reduce (fn [[s2 es] e]
@@ -182,19 +193,41 @@
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
 
+(impl/deftype (Infer syn err))
+
+(defn -infer-ann-err [x]
+  (fn [env]
+    (try
+      (let [[s [n t e]] (-infer env x)
+            errs        (remove nil? (mapcat :e (impl/-vec n)))]
+        [s (SyntaxNode. n t (into e errs))])
+      ;; catch clojure.lang.ExceptionInfo e
+      ;; (let [d (ex-data e)]
+      ;;   (throw
+      ;;    (ex-info (str "Inference failure: " (-> d :cause))
+      ;;             {:x x :next d})))
+      (catch Throwable t
+        [id (SyntaxNode. x
+                         (Var. 'err)
+                         [(str "Inference failure: " (.getMessage t))])]
+        (throw t)
+        ))))
+
 (defn -infer-ann-err [x]
   (fn [env]
     (try
       (-infer env x)
-      (catch clojure.lang.ExceptionInfo e
-        (let [d (ex-data e)]
-          (throw
-           (ex-info (str "Inference failure: " (-> d :cause))
-                    {:x x :next d}))))
+      ;; catch clojure.lang.ExceptionInfo e
+      ;; (let [d (ex-data e)]
+      ;;   (throw
+      ;;    (ex-info (str "Inference failure: " (-> d :cause))
+      ;;             {:x x :next d})))
       (catch Throwable t
-        (throw
-         (ex-info (str "Inference failure: " (.getMessage t))
-                  {:x x :cause t}))))))
+        [id (SyntaxNode. x
+                         (Var. 'err)
+                         [(str "Inference failure: " (.getMessage t))])]
+        (throw t)
+        ))))
 
 (defn check
   ([expr] (check @t/type-env expr))

@@ -214,7 +214,7 @@
         _ (assert t')
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
         [_ t]   (infer/release t)]
-    (t/substitute (SyntaxNode. e t) s)))
+    (t/substitute (SyntaxNode. e t nil) s)))
 
 (defn match-impl [pred sub {:keys [f impls]}]
   (let [n       (count (:arglist (first impls)))
@@ -235,7 +235,7 @@
         _ (assert t')
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
         [_ t]   (infer/release t)]
-    (t/substitute (SyntaxNode. e t) s)))
+    (t/substitute (SyntaxNode. e t nil) s)))
 
 (defn impl [pred sub impls]
   (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)

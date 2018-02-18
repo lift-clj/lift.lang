@@ -83,11 +83,11 @@
     (dissoc :b)
     :a)
 
-;; ;; `lookup` fails becaus :b not in the map
-;; (-> {:a 1 :b :c}
-;;     (assoc ::y "your name")
-;;     (dissoc :b)
-;;     :b)
+;; `lookup` fails becaus :b not in the map
+(-> {:a 1 :b :c}
+    (assoc ::y "your name")
+    (dissoc :b)
+    :b)
 
 (def VAT 0.20)
 

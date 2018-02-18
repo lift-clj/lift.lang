@@ -69,7 +69,9 @@
                      :kvs (s/+ (s/cat :l keyword? :a ::record-expr)))))
 
 (s/def ::record-restriction
-  (s/and seq? (s/cat :op #{'dissoc} :r ::record-expr :l keyword?)))
+  (s/and seq? (s/cat :op #{'dissoc}
+                     :r ::record-expr
+                     :ls (s/+ keyword?))))
 
 (s/def ::application
   (s/and seq? (s/cat :op any? :args (s/* any?))))
@@ -188,8 +190,8 @@
           r
           (partition 2 kvs)))
 
-(defmethod -parse :Res [_ [op r l]]
-  (-> op (Apply. r) (Apply. l)))
+(defmethod -parse :Res [_ [op r & ls]]
+  (reduce (fn [r l] (Restrict. l r)) r ls))
 
 (defmethod -parse :Fun [_ f] f)
 
@@ -202,4 +204,5 @@
                             (s/explain-data ::expr expr))))
           (= :Def (first conformed))
           (ana parse (nth expr 2))
+          :default
           (-parse (first conformed) expr))))
