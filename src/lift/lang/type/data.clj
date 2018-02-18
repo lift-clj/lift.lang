@@ -77,6 +77,7 @@
         type-expr (apply list tag args)
         sig (def/type-signature type-expr)]
     `(do
+       (swap! t/type-env assoc '~tag ~sig)
        (def/intern-type-only ~sig)
        ~@(mapcat
           (fn [part]

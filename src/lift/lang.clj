@@ -118,11 +118,11 @@
   (* [x y] (prim/*Double x y))
   (- [x y] (prim/-Double x y)))
 
-(interface (Div a b)
-  (/ (a -> a -> b)))
+(interface (Div a)
+  (/ (a -> a -> Double)))
 
-(impl (Div Long Ratio)
+(impl (Div Long)
   (/ [x y] (prim/divLong x y)))
 
-(impl (Div Double Double)
+(impl (Div Double)
   (/ [x y] (prim/divDouble x y)))

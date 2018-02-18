@@ -89,11 +89,11 @@
 ;;     (dissoc :b)
 ;;     :b)
 
-(def VAT 20)
+(def VAT 0.20)
 
 ;; Weird calculation because I've not implemented polymorphic numbers
-;; (defn with-vat [x]
-;;   (double (/ (* (+ 100 VAT) x) 100)))
+(defn with-vat [x]
+  (* (+ 1.0 VAT) x))
 
 ;; (/ 100 20)
 
@@ -126,10 +126,6 @@
       (assoc :e {:f {:g 30}})
       (assoc :h {:i "wut"})))
 
-(= (Just 1) (Just 2))
-
-( there is a substitution step missing from tooling because of infer/check)
-
 ;; ;; Tells you things about your data (\space t e)
 
 ;; (deep-map-returning-fn 1142)
@@ -137,20 +133,19 @@
 ;; (:a (deep-map-returning-fn 1142))
 
 
-;; (defn some-function [condition either-val]
-;;   (if condition
-;;     (case either-val
-;;       [Left  a] (:something a)
-;;       [Right b] b)
-;;     500))
+(defn some-function [condition either-val]
+  (if condition
+    (case either-val
+      (Left  a) (:something a)
+      (Right b) b)
+    500))
 
-;; (defn some-other-function [condition either-val]
-;;   (if condition
-;;     (case either-val
-;;       (Left  a) (Just (:something a))
-;;       (Right b) Nothing)
-;;     Nothing))
-
+(defn some-other-function [condition either-val]
+  (if condition
+    (case either-val
+      (Left  a) (Just (:something a))
+      (Right b) Nothing)
+    Nothing))
 
 ;; ;; Different logical interpreter
 

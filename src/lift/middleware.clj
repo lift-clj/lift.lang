@@ -14,7 +14,9 @@
    [lift.lang.rewrite :as rewrite]
    [lift.lang.type :as type]
    [lift.lang.type.base :as base]
-   [lift.lang.util :as u])
+   [lift.lang.util :as u]
+   [lift.lang.analyze :as ana]
+   [lift.lang.type.impl :as impl])
   (:import
    [lift.lang.type.base SyntaxNode Var]))
 
@@ -61,17 +63,22 @@
        (sub-pretty-vars (map (comp #(Var. %) symbol str char) (range 97 123)))
        (type/sub))))
 
+(defn check
+  ([expr] (check @type/type-env expr))
+  ([env expr]
+   (let [[s ast] ((impl/hylo infer/-infer-ann-err ana/parse expr) env)]
+     [s (type/substitute ast s)])))
+
 (defn lift [expr]
   (try
-    (let [[_ t :as expr] (-> expr u/macroexpand-all infer/check)
+    (let [[s [_ t :as expr]] (-> expr u/macroexpand-all check)
           ftvs (base/ftv t)
-          sub  (sub-pretty-vars ftvs)
-          t'   (type/substitute t sub)]
+          sub  (sub-pretty-vars ftvs)]
       (->> expr
-           (rewrite/rewrite @type/type-env)
+           (rewrite/rewrite @type/type-env s)
            (rewrite/emit)
            (c/eval)
-           (#(SyntaxNode. % t'))))
+           (#(SyntaxNode. % (type/substitute t sub)))))
     (catch clojure.lang.ExceptionInfo e
       (prn (.getMessage e))
       e)))

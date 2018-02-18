@@ -237,13 +237,6 @@
         [_ t]   (infer/release t)]
     (t/substitute (SyntaxNode. e t) s)))
 
-(s/conform
- ::match-impl
- '(=
-   ([(Just x) (Just y)] (= x y))
-   ([Nothing   Nothing] True)
-   ([_         _      ] False)))
-
 (defn impl [pred sub impls]
   (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)
                                       :match   (s/coll-of ::match-impl))

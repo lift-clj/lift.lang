@@ -6,8 +6,12 @@
    [lift.lang.type :as t]
    [lift.lang.type.base :as base]
    [lift.lang.type.impl :as impl]
-   [lift.lang.util :as u]))
+   [lift.lang.unification :as unify]
+   [lift.lang.util :as u]
+   [lift.lang.analyze :as ana]
+   [lift.lang.rewrite :as rewrite]))
 
+(base/import-syntax-types)
 (base/import-type-types)
 ;; requirements of interfaces:
 ;; type syntax parser & ast
@@ -24,15 +28,27 @@
 
 (def interfaces (atom {}))
 
+(defn uncurry [f]
+  (fn [& args]
+    (reduce #(% %2) f args)))
+
 (defn get-impl [d vars f sig arglist]
-  (let [path (->> arglist
-                  (map (fn [s a]
-                         (and (instance? Var s)
-                              (contains? vars (:a s))
-                              (type a))) ;; TODO: and vargs?
-                       (impl/-vec sig))
-                  (filterv identity))]
-    (get-in d (into path [f]))))
+  (let [sub (->> arglist
+                 (map (fn [s a]
+                        (and (instance? Var s)
+                             (contains? vars (:a s))
+                             (t/sub {(:a s) (ana/type (Literal. a))})))
+                      (sig/arrseq sig))
+                 (filter identity)
+                 (apply unify/compose))
+        d' (t/substitute d sub)]
+    (uncurry
+     (eval
+      (rewrite/emit
+       (rewrite/rewrite
+        @t/type-env
+        nil
+        (get (get @t/type-env d') (u/resolve-sym f))))))))
 
 (defn default-impl [f sig pred t impl]
   (let [{:keys [arglist args]} (sig/arglist sig)]
@@ -42,7 +58,8 @@
                                  '~f
                                  ~sig
                                  ~(vec (remove #{'&} arglist)))
-                       ~impl)]
+                       ~impl
+                       )]
          (apply impl# (apply concat ~args))))))
 
 (defn type-sig-impl [f sig pred]
@@ -68,9 +85,10 @@
 
 (defn impl [[tag & as] impls]
   (let [consts (map #(Const. %) as)
+        tag-ts (map #(or (@t/type-env %) (Const. %)) as)
         [_ bs] (get @t/type-env tag)
         pred   (Predicate. tag consts)
-        sub    (->> (map (fn [a [b]] [b a]) consts bs) (into {}) t/sub)]
+        sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]
     `(do
        (swap! t/type-env assoc ~pred ~(sig/impl pred sub impls))
        (list ~pred))))

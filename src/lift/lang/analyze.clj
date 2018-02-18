@@ -202,5 +202,4 @@
                             (s/explain-data ::expr expr))))
           (= :Def (first conformed))
           (ana parse (nth expr 2))
-          :else
           (-parse (first conformed) expr))))

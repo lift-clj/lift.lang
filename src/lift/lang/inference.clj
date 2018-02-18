@@ -55,13 +55,27 @@
    (every? #(instance? Const %) as))
   ([_] false))
 
-(defn concrete-instance [[tag as]]
-  (Predicate. tag (mapv (comp #(Const. %) symbol name :tag) as))
+(p/defn concrete-instance?
+  ([[Predicate _ as :as p]]
+   (every? concrete-instance? as))
+  ([[Container tag args]]
+   (every? concrete-instance? args))
+  ([[Const _]] true)
+  ([_] false))
+
+(p/defn concrete-instance
+  ([[Predicate tag as]]
+   (Predicate. tag (mapv concrete-instance as)))
+  ([[Container tag args]]
+   (Const. (symbol (name tag))))
   ;; TODO: ^^ this should be ns qualified
-  )
+  ([[Const _ :as c]] c)
+  ([x] x))
 
 (defn release? [_Gamma p]
-  (let [p (concrete-instance p)]
+  (let [p (if (concrete-instance? p)
+            (concrete-instance p)
+            p)]
     (or (nil? p)
         (contains? _Gamma p)
         (and (not (concrete-instance? p))

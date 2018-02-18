@@ -19,33 +19,24 @@
 (extend-protocol f/Functor
   clojure.lang.Fn (-map [x f] x))
 
-(p/defn concrete-instance?
-  ([[Predicate _ as :as p]]
-   (every? concrete-instance? as))
-  ([[Container tag args]]
-   (every? concrete-instance? args))
-  ([[Const _]] true)
-  ([_] false))
-
 (p/defn -rewrite
-  ([_Gamma [SyntaxNode
+  ([_Gamma sub [SyntaxNode
        [Symbol f]
        [Predicated [[Predicate _ as :as p]] [Arrow :as t]] :as syn]]
-   (prn 'xxx p (concrete-instance? p))
-   (if (concrete-instance? p)
+   (if (infer/concrete-instance? p)
      (let [p (infer/concrete-instance p)]
-       (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma)))
-       f)))
-  ([_ [SyntaxNode [Apply [Lambda :as e1] e2] [Arrow _]]]
+       (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma sub))))
+     (Curry. (resolve f))))
+  ([_ _ [SyntaxNode [Apply [Lambda :as e1] e2] [Arrow _]]]
    (Apply. e1 e2))
-  ([_ [SyntaxNode [Apply e1 e2] [Arrow _]]]
+  ([_ _ [SyntaxNode [Apply e1 e2] [Arrow _]]]
    (Apply. (Curry. e1) e2))
-  ([_ [SyntaxNode x _]] x)
-  ([_ [Curry f]] f)
-  ([_ x] x))
+  ([_ _ [SyntaxNode x _]] x)
+  ([_ _ [Curry f]] f)
+  ([_ _ x] x))
 
-(defn rewrite [_Gamma x]
-  (impl/cata (fn rewrite [x] (-rewrite _Gamma x)) x))
+(defn rewrite [_Gamma sub x]
+  (impl/cata (fn rewrite [x] (-rewrite _Gamma sub x)) x))
 
 (defn ctor [s]
   (let [n (name s)]
@@ -65,10 +56,12 @@
   ([[Prim f]] f)
   ([[Curry f]] `(fn* [x#] (partial ~f x#)))
   ([expr]
-   (throw
-    (Exception. (format "Unrecognized expr %s : %s"
-                        (pr-str expr)
-                        (pr-str (type expr)))))))
+   (if (var? expr)
+     expr
+     (throw
+      (Exception. (format "Unrecognized expr %s : %s"
+                          (pr-str expr)
+                          (pr-str (type expr))))))))
 
 (defn emit [expr]
   (impl/cata -emit expr))
