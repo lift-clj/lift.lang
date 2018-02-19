@@ -53,6 +53,8 @@
   ([[If cond then else]] (list 'if cond then else))
   ([[Select l r]] (list r l))
   ([[Restrict l r]] (list 'dissoc r l))
+  ([[List xs]] `(list ~@xs))
+  ([[Vector xs]] xs)
   ([[Map r]] r)
   ([[Prim f]] f)
   ([[Curry f]] `(fn* [x#] (partial ~f x#)))

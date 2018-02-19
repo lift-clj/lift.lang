@@ -20,7 +20,8 @@
    [lift.lang.type.impl :as impl]
    [lift.lang.signatures :as sig]
    [lift.lang.type.def :as def]
-   [lift.tools.reader :as rdr])
+   [lift.tools.reader :as rdr]
+   [lift.lang.unification :as unify])
   (:import
    [lift.lang.type.base Forall Literal Mark SyntaxNode Var]
    [lift.lang.type.impl Type]))
@@ -118,6 +119,7 @@
                   (base/$ (resolve v) t')))
               (base/$ (c/eval ret) t'))))))
     (catch Throwable t
+      (prn t)
       t)))
 
 (defn type-of-symbol [expr]
@@ -168,6 +170,36 @@
       (prn t)
       t)))
 
+(def impl-namespaces
+  (->> '[lift.lang.case
+         lift.lang.defn
+         lift.lang.type
+         lift.lang.type.base
+         lift.lang.type.impl]
+       (map name)
+       (set)))
+
+(defn impl? [sym]
+  (contains? impl-namespaces (namespace sym)))
+
+(defn type-search-expr-at-point [msg]
+  (let [t? (type-of-expr-at-point msg)]
+    (if (instance? Throwable t?)
+      t?
+      (->> @type/type-env
+           (keep (fn [[k v]]
+                   (try
+                     (when (and (not (impl? k)) (unify/unify (:t t?) (:t v)))
+                       k)
+                     (catch Throwable _))))))))
+
+(defn type-replace-expr-at-point [msg]
+  (let [t? (type-search-expr-at-point msg)]
+    (prn (first t?))
+    (if (instance? Throwable t?)
+      (throw t?)
+      (first t?))))
+
 (defn run-op [msg]
   (try
     ((ns-resolve 'lift.middleware (::op msg)) msg)
@@ -179,7 +211,7 @@
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
         code  (r/read-string code)]
     (if (control? code)
-      (handler (assoc msg :eval `identity :code (list 'quote (run-op code))))
+      (handler (assoc msg :eval `identity :code [(run-op code)]))
       (let [eval  (case op "eval" `lift "load-file" `lift)]
         (if lift?
           (-> (assoc msg :eval eval)

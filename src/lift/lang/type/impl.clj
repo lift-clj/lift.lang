@@ -27,7 +27,10 @@
   Object
   (-show [x] x)
   IPersistentMap
-  (-show [x] (pr-str x))
+  (-show [x] (->> x
+                  (map (fn [[k v]] (str (pr-str k) " " v)))
+                  (string/join ", ")
+                  (format "{%s}")))
   ISeq
   (-show [x] (pr-str x)))
 

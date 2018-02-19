@@ -2,7 +2,7 @@
   (:require
    [lift.f.functor :as f]
    [lift.lang.pattern :as p]
-   [lift.lang.unification :refer [compose unify]]
+   [lift.lang.unification :as unify :refer [compose unify]]
    [lift.lang.util :as u]
    [lift.lang.type :as t :refer [id]]
    [lift.lang.type.base :as base :refer [$]]
@@ -113,6 +113,18 @@
     (every? (partial release? _Gamma) ps)
     [s ps]))
 
+(defn infer-coll [_Gamma ctor tag coll]
+  (let [[s1 coll']
+        (reduce (fn [[s xs] x] (let [[s x] (x _Gamma)] [s (conj xs x)]))
+                [id []]
+                coll)
+        s2 (unify/unify-coll (map :t coll'))
+        _ (prn coll' s2)
+        t2 (if (seq coll')
+             (-> coll' first :t (t/substitute s2))
+             (Var. (gensym 'a)))]
+    [s2 ($ (ctor coll') (Container. tag [t2]))]))
+
 (p/defn -infer
   ([_Gamma [Literal _ :as expr]] [id ($ expr (ana/type expr))])
 
@@ -171,6 +183,12 @@
          s2 (unify rectype t2)]
      [(compose s2 s1)
       ($ (Restrict. label r) (Record. (t/substitute btype s2)))]))
+
+  ([_Gamma [List xs]]
+   (infer-coll _Gamma #(List. %) 'List xs))
+
+  ([_Gamma [Vector xs]]
+   (infer-coll _Gamma #(Vector. %) 'Vector xs))
 
   ([_Gamma [Map m]]
    (let [[s1 vals] (reduce (fn [[s2 es] e]

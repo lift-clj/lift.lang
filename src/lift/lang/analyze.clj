@@ -77,7 +77,7 @@
                      :ls (s/+ keyword?))))
 
 (s/def ::application
-  (s/and seq? (s/cat :op any? :args (s/* any?))))
+  (s/and seq? (s/cat :op #(not (= 'quote %)) :args (s/* any?))))
 
 (s/def ::let
   (s/and seq?
@@ -87,6 +87,10 @@
 
 (s/def ::if
   (s/and seq? (s/cat :if #{'if} :cond any? :then any? :else any?)))
+
+(s/def ::list
+  (s/or :quoted (s/and seq? #(= 'quote (first %)) (comp seq? second))
+        :empty  (s/and seq? empty?)))
 
 (s/def ::vector vector?)
 
@@ -117,6 +121,7 @@
         :Ext ::record-extension
         :Res ::record-restriction
         :App ::application
+        :Lst ::list
         :Vec ::vector
         :Rec ::record))
 
@@ -176,6 +181,11 @@
 
 (defmethod -parse :If  [_ [_ cond then else]]
   (If. cond then else))
+
+(defmethod -parse :Lst [_ expr]
+  (if (= 'quote (first expr))
+    (List. (second expr))
+    (List. expr)))
 
 (defmethod -parse :Vec [_ expr] (Vector. expr))
 

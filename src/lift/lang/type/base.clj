@@ -94,6 +94,11 @@
 (impl/deftype (Restrict l r)
   Show (-show [_] (format "(dissoc %s %s)" r l)))
 
+(impl/deftype (List xs)
+  Functor (-map  [_ f] (List. (f/-map xs f)))
+  Ftv     (-ftv  [_]   (set xs))
+  Show    (-show [_]   (format "(%s)" (string/join " " xs))))
+
 (impl/deftype (Vector xs)
   Functor (-map  [_ f] (Vector. (f/-map xs f)))
   Ftv     (-ftv  [_]   (set xs))
@@ -187,8 +192,11 @@
 (defn $ [expr type & [err meta]]
   (SyntaxNode. expr type err meta))
 
+(def container-types
+  `[Container RowEmpty Row Record Restrict Select List Vector Map Tuple])
+
 (defmacro import-container-types []
-  `(do (import ~@`[Container RowEmpty Row Record Restrict Select Vector Map Tuple]) nil))
+  `(do (import ~@container-types) nil))
 
 (defmacro import-infer-types []
   `(do (import ~@`[Env Substitution]) nil))

@@ -7,7 +7,12 @@
   (:require [lift.lang :refer :all]
             [lift.lang.inference :as infer]))
 
-;; ;; (not= 1 (coerce "1"))
+;; (_? (Just 1) (Just 1))
+;; '(1 2 3)
+
+;; [1 "" 3]
+
+;; (= 1 (coerce "1"))
 
 ;; ;; (case [Nothing 2]
 ;; ;;   [(Just a) b] a
@@ -45,11 +50,11 @@
 
 ;; ;; (get {:a 1 :b 2} :a)
 
-(assoc {} :a 2 :b 2 :c "test")
+;; (assoc {} :a 2 :b 2 :c "test")
 
-(assoc {} :a (+ _? 1))
+;; (assoc {} :a (+ _? 1))
 
-(+ _? 1)
+;; (+ _? 1)
 
 ;; (+ _? 1 "test")
 
@@ -130,9 +135,10 @@
 ;;       (assoc :e {:f {:g 30}})
 ;;       (assoc :h {:i "wut"})))
 
-;; ;; ;; Tells you things about your data (\space t e)
+;; ;; ;; ;; Tells you things about your data (\space t e)
 
 ;; (deep-map-returning-fn 1142)
+
 
 ;; ;; (:a (deep-map-returning-fn 1142))
 
