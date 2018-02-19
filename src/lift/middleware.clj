@@ -10,6 +10,7 @@
    [clojure.core.specs.alpha :as cs]
    [clojure.string :as string]
    [clojure.java.io :as io]
+   [lift.lang :as lift]
    [lift.lang.inference :as infer]
    [lift.lang.rewrite :as rewrite]
    [lift.lang.type :as type]
@@ -26,6 +27,13 @@
 
 (def ^:dynamic *type-check* false)
 (def ^:dynamic *prn-type* false)
+
+(def ignore #{#'ns 'ns 'try #'type/def #'lift/data #'defmacro})
+
+(defn ignore? [[op]]
+  (and (symbol? op)
+       (or (contains? ignore op)
+           (contains? ignore (resolve op)))))
 
 (deftype Ret [x t])
 
@@ -89,59 +97,28 @@
 
 (defn lift [expr]
   (try
-    (let [code (u/macroexpand-all expr)
-          [s [_ t err :as expr]] (check code)]
-      (if err
-        (throw (Exception. (str (pr-str expr) "\n" (string/join "\n" err))))
-        (let [ftvs (base/ftv t)
-              sub  (sub-pretty-vars ftvs)
-              ret  (->> expr
-                        (rewrite/rewrite @type/type-env s)
-                        (rewrite/emit))
-              t'   (type/substitute t sub)]
-          (if (def? code)
-            (let [name (second code)]
-              (c/eval (list 'def name ret))
-              (let [v (u/resolve-sym name)
-                    sigma (Forall. (base/ftv t') t')]
-                (swap! type/type-env assoc v sigma)
-                (base/$ (resolve v) t')))
-            (base/$ (c/eval ret) t')))))))
-
-;; (defn t [expr-info]
-;;   (let [{:keys [expr]} (rdr/read-with-meta (:expr expr-info))]
-;;     (or (type-of-symbol expr)
-;;         (type-of-type expr)
-;;         (let [{:keys [expr top-level]} expr-info
-;;               [expr topx] (rdr/unify-position expr top-level)]
-;;           (if (= expr topx)
-;;             (check (u/macroexpand-all (:expr topx)))
-;;             (try
-;;               (let [[_ syn] (check (u/macroexpand-all (:expr topx)))]
-;;                 (or (-> t-ast
-;;                         (type/walk (fn [x]
-;;                                      (cond (found? expr x)
-;;                                            (reduced (:type x))
-;;                                            (and (not (symbol? (:expr x)))
-;;                                                 (= (:expr expr) (:expr x)))
-;;                                            (reduced (:type x))
-;;                                            :else
-;;                                            (if (map? x)
-;;                                              (first (filter reduced? (vals x)))))))
-;;                         (unreduced))
-;;                     (prn 'default)
-;;                     (:type (typed-ast (:expr expr)))))
-;;               (catch Throwable t t)))))))
-
-
-(defn unmark [x]
-  (impl/cata (fn [x]
-               (if (instance? Mark x)
-                 (if (instance? clojure.lang.IObj (:a x))
-                   (vary-meta (:a x) assoc :mark true)
-                   (:a x))
-                 x))
-             x))
+    (if (and (seq? expr) (ignore? expr))
+      (c/eval expr)
+      (let [code (u/macroexpand-all expr)
+            [s [_ t err :as expr]] (check code)]
+        (if err
+          (throw (Exception. (str (pr-str expr) "\n" (string/join "\n" err))))
+          (let [ftvs (base/ftv t)
+                sub  (sub-pretty-vars ftvs)
+                ret  (->> expr
+                          (rewrite/rewrite @type/type-env s)
+                          (rewrite/emit))
+                t'   (type/substitute t sub)]
+            (if (def? code)
+              (let [name (second code)]
+                (c/eval (list 'def name ret))
+                (let [v (u/resolve-sym name)
+                      sigma (Forall. (base/ftv t') t')]
+                  (swap! type/type-env assoc v sigma)
+                  (base/$ (resolve v) t')))
+              (base/$ (c/eval ret) t'))))))
+    (catch Throwable t
+      t)))
 
 (defn type-of-symbol [expr]
   (when-let [t (and (symbol? expr)
@@ -168,8 +145,8 @@
   (and (map? x) (contains? x ::op)))
 
 (defn type-of-expr-at-point [{:keys [file]
-                              {[line ] :pos top  :code} :top
-                              {[ln cl] :pos expr :code} :expr}]
+                              {[_ _ t :as tp] :pos top  :code} :top
+                              {[_ _ e :as ep] :pos expr :code} :expr}]
   (try
     (or (and (not (symbol? expr))
              (ana/literal? expr)
@@ -179,7 +156,7 @@
 
         (type-of-type expr)
 
-        (let [expr (rdr/top-level-sexp file line ln cl)
+        (let [expr (rdr/top-level-sexp top (- e t))
               code (u/macroexpand-all expr)
               [s [n t err :as expr]] (check code)]
           (let [ftvs (base/ftv t)
@@ -188,7 +165,8 @@
                 sigma (Forall. (base/ftv t') t')]
             (find-mark expr))))
     (catch Throwable t
-      (println t))))
+      (prn t)
+      t)))
 
 (defn run-op [msg]
   (try
@@ -202,9 +180,11 @@
         code  (r/read-string code)]
     (if (control? code)
       (handler (assoc msg :eval `identity :code (list 'quote (run-op code))))
-      (let [eval  (case op "eval" `lift "type" prn c/eval)]
+      (let [eval  (case op "eval" `lift "load-file" `lift)]
         (if lift?
-          (handler (assoc msg :eval eval))
+          (-> (assoc msg :eval eval)
+              (cond-> (= op "load-file") (dissoc :ns))
+              (handler))
           (handler msg))))))
 
 (defn repl-fn [handler {:keys [op code ns file column line] :as msg}]

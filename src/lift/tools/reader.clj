@@ -48,6 +48,48 @@
   ([rdr mark-line mark-col]
    (SyntaxMarkingPushbackReader. rdr mark-line mark-col nil nil)))
 
+(deftype CharSyntaxMarkingPushbackReader
+    [rdr
+     ^:unsynchronized-mutable cnt
+     ^:unsynchronized-mutable mark-at
+     ^:unsynchronized-mutable mark]
+  rt/Reader
+  (rt/read-char [reader]
+    (cond
+      (and mark-at (= mark-at cnt))
+      (do
+        (set! mark-at nil)
+        (set! mark "mark ")
+        \#)
+      (seq mark)
+      (let [ch (first mark)]
+        (set! mark (subs mark 1))
+        ch)
+      :else
+      (let [ch (rt/read-char rdr)]
+        (set! cnt (inc cnt))
+        ch)))
+  (rt/peek-char [reader] (rt/peek-char rdr))
+  rt/IPushbackReader
+  (rt/unread [reader ch]
+    (if (seq mark)
+      (set! mark (str ch mark))
+      (do
+        (rt/unread rdr ch)
+        (set! cnt (dec cnt)))))
+  rt/IndexingReader
+  (rt/get-line-number [reader] (rt/get-line-number rdr))
+  (rt/get-column-number [reader] (rt/get-column-number rdr))
+  (rt/get-file-name [reader] (rt/get-file-name rdr))
+  java.io.Closeable
+  (close [this]
+    (when (instance? java.io.Closeable rdr)
+      (.close ^java.io.Closeable rdr))))
+
+(defn ^java.io.Closeable char-syntax-marking-push-back-reader
+  ([rdr mark-at]
+   (CharSyntaxMarkingPushbackReader. rdr 0 mark-at nil)))
+
 ;; (with-open [r (-> "test 1 2"
 ;;             (java.io.StringReader.)
 ;;             (rt/indexing-push-back-reader)
@@ -81,11 +123,9 @@
     (do (rt/read-line r) (recur (dec n) r))
     r))
 
-(defn top-level-sexp [file line mark-line mark-col]
-  (with-open [r (-> (io/file file)
-                    (io/reader)
+(defn top-level-sexp [string mark-at]
+  (with-open [r (-> (java.io.StringReader. string)
                     (rt/indexing-push-back-reader)
-                    (syntax-marking-push-back-reader mark-line mark-col))]
-    (drop-lines (dec line) r)
+                    (char-syntax-marking-push-back-reader mark-at))]
     (binding [r/*data-readers* {'mark (fn [x] (Mark. x))}]
       (r/read r))))

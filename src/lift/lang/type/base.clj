@@ -101,9 +101,7 @@
 
 (impl/deftype (Map r)
   Functor (-map [_ f] (Map. (f/-map r f)))
-  Show    (-show [_] (->> (map (fn [[k v]] (str k " " v)) r)
-                          (string/join ", ")
-                          (format "{%s}"))))
+  Show    (-show [_]  r))
 
 (impl/deftype (Tuple xs)
   Functor (-map  [_ f] (Tuple. (f/-map xs f)))

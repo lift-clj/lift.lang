@@ -29,7 +29,8 @@
   ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
 (defn lookup [_Gamma a]
-  (or (if-let [t (get _Gamma a)] [a t])
+  (or (and (= '_? a) [a (Forall. #{} (Var. (gensym 'a)))])
+      (if-let [t (get _Gamma a)] [a t])
       (let [a' (u/resolve-sym a)] (if-let [t (get _Gamma a')] [a' t]))
       (u/unbound-variable-error a)))
 

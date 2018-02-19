@@ -27,6 +27,8 @@
   Object
   (-show [x] x)
   IPersistentMap
+  (-show [x] (pr-str x))
+  ISeq
   (-show [x] (pr-str x)))
 
 
