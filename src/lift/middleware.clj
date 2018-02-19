@@ -157,7 +157,7 @@
 (defn find-mark [x]
   (let [p (fn [x] (and (instance? SyntaxNode x) (-> x :m :mark true?)))
         a (atom nil)
-        f (fn [x] (reset! a (base/$ (:expr (:m x)) (:t x))))]
+        f (fn [x] (reset! a (base/$ (pr-str (:expr (:m x))) (:t x))))]
     (if (p x)
       (f x)
       (do
@@ -173,7 +173,7 @@
   (try
     (or (and (not (symbol? expr))
              (ana/literal? expr)
-             (base/$ expr (ana/type (Literal. expr))))
+             (base/$ (Literal. expr) (ana/type (Literal. expr))))
 
         (type-of-symbol expr)
 

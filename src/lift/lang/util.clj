@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [macroexpand])
   (:require
    [clojure.spec.alpha :as s]
-   [riddley.compiler :as cmp])
+   [riddley.compiler :as cmp]
+   [lift.lang.type.base :as base])
   (:import
    [lift.lang.type.base Mark]))
 

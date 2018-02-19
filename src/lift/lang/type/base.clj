@@ -147,10 +147,12 @@
 (impl/deftype (SyntaxNode n t e m)
   Functor (-map  [_ f] (SyntaxNode. (f n) t e m))
   Show    (-show [_]
-            (str (cond (instance? Type n) n
-                       (string? n) n
-                       :else (pr-str n))
-                 (when t (str " : " (pr-str t)))))
+            (let [expr (cond (instance? Type n) n
+                             (string? n) n
+                             :else (pr-str n))]
+              (str n
+                   (when t (str (when (> (count expr) 40) "\n  ")
+                                " : " (pr-str t))))))
   Sub     (-sub  [_ s] (SyntaxNode. (n s) (substitute t s) e m)))
 
 (impl/deftype (Curry f)
