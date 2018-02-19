@@ -199,15 +199,16 @@
 (defmethod -parse :Fun [_ f] f)
 
 (defn parse [expr]
-  (if (instance? Mark expr)
-    ($ (parse (:a expr)) nil nil {:mark true})
-    (let [conformed (s/conform ::expr expr)]
-      (cond (s/invalid? conformed)
-            (if (instance? Type expr)
-              expr
-              (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
-                              (s/explain-data ::expr expr))))
-            (= :Def (first conformed))
-            (ana parse (nth expr 2))
-            :default
-            ($ (-parse (first conformed) expr) nil nil (meta expr))))))
+  (let [conformed (s/conform ::expr expr)]
+    (cond (s/invalid? conformed)
+          (if (instance? Type expr)
+            expr
+            (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
+                            (s/explain-data ::expr expr))))
+          (= :Def (first conformed))
+          (ana parse (nth expr 2))
+          :default
+          ($ (-parse (first conformed) expr)
+             nil
+             nil
+             (-> expr meta (assoc :expr expr))))))

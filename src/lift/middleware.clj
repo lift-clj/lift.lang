@@ -21,7 +21,7 @@
    [lift.lang.type.def :as def]
    [lift.tools.reader :as rdr])
   (:import
-   [lift.lang.type.base Forall Mark SyntaxNode Var]
+   [lift.lang.type.base Forall Literal Mark SyntaxNode Var]
    [lift.lang.type.impl Type]))
 
 (def ^:dynamic *type-check* false)
@@ -108,12 +108,6 @@
                 (base/$ (resolve v) t')))
             (base/$ (c/eval ret) t')))))))
 
-(defn type-of-symbol [expr]
-  (when (symbol? expr) (get @type/type-env (u/resolve-sym expr))))
-
-(defn type-of-type [expr]
-  (try (get @type/type-env (def/type-signature expr)) (catch Throwable _)))
-
 ;; (defn t [expr-info]
 ;;   (let [{:keys [expr]} (rdr/read-with-meta (:expr expr-info))]
 ;;     (or (type-of-symbol expr)
@@ -149,36 +143,50 @@
                  x))
              x))
 
+(defn type-of-symbol [expr]
+  (when-let [t (and (symbol? expr)
+                    (get @type/type-env (u/resolve-sym expr)))]
+    (base/$ (resolve expr) t)))
+
+(defn type-of-type [expr]
+  (try
+    (when-let [t (get @type/type-env (def/type-signature expr))]
+      (base/$ expr t))
+    (catch Throwable _)))
+
 (defn find-mark [x]
-  (->> x
-       (impl/cata (fn [x]
-                    (if (instance? SyntaxNode x)
-                      (if (-> x :m :mark true?)
-                        [(Mark. (:t x))]
-                        (if (instance? Type (:n x))
-                          (filter #(instance? Mark %) (flatten (impl/-vec (:n x))))
-                          (:n x)))
-                      x)))
-       (impl/-vec)
-       (flatten)
-       (#(doto % prn))
-       (distinct)
-       (first)
-       (:a)))
+  (let [p (fn [x] (and (instance? SyntaxNode x) (-> x :m :mark true?)))
+        a (atom nil)
+        f (fn [x] (reset! a (base/$ (:expr (:m x)) (:t x))))]
+    (if (p x)
+      (f x)
+      (do
+        (impl/cata (fn [x] (if (p x) (f x) x)) x)
+        @a))))
 
 (defn control? [x]
   (and (map? x) (contains? x ::op)))
 
-(defn type-of-expr-at-point [{:keys [file top expr]}]
+(defn type-of-expr-at-point [{:keys [file]
+                              {[line ] :pos top  :code} :top
+                              {[ln cl] :pos expr :code} :expr}]
   (try
-    (let [expr (apply rdr/top-level-sexp file (first top) expr)
-          code (u/macroexpand-all expr)
-          [s [n t err :as expr]] (check code)]
-      (let [ftvs (base/ftv t)
-            sub  (sub-pretty-vars ftvs)
-            t'   (type/substitute t sub)
-            sigma (Forall. (base/ftv t') t')]
-        (find-mark n)))
+    (or (and (not (symbol? expr))
+             (ana/literal? expr)
+             (base/$ expr (ana/type (Literal. expr))))
+
+        (type-of-symbol expr)
+
+        (type-of-type expr)
+
+        (let [expr (rdr/top-level-sexp file line ln cl)
+              code (u/macroexpand-all expr)
+              [s [n t err :as expr]] (check code)]
+          (let [ftvs (base/ftv t)
+                sub  (sub-pretty-vars ftvs)
+                t'   (type/substitute t sub)
+                sigma (Forall. (base/ftv t') t')]
+            (find-mark expr))))
     (catch Throwable t
       (println t))))
 
