@@ -21,7 +21,8 @@
    [lift.lang.type.def :as def]
    [lift.tools.reader :as rdr])
   (:import
-   [lift.lang.type.base Forall SyntaxNode Var]))
+   [lift.lang.type.base Forall Mark SyntaxNode Var]
+   [lift.lang.type.impl Type]))
 
 (def ^:dynamic *type-check* false)
 (def ^:dynamic *prn-type* false)
@@ -139,16 +140,54 @@
 ;;               (catch Throwable t t)))))))
 
 
+(defn unmark [x]
+  (impl/cata (fn [x]
+               (if (instance? Mark x)
+                 (if (instance? clojure.lang.IObj (:a x))
+                   (vary-meta (:a x) assoc :mark true)
+                   (:a x))
+                 x))
+             x))
+
+(defn find-mark [x]
+  (->> x
+       (impl/cata (fn [x]
+                    (if (instance? SyntaxNode x)
+                      (if (-> x :m :mark true?)
+                        [(Mark. (:t x))]
+                        (if (instance? Type (:n x))
+                          (filter #(instance? Mark %) (flatten (impl/-vec (:n x))))
+                          (:n x)))
+                      x)))
+       (impl/-vec)
+       (flatten)
+       (#(doto % prn))
+       (distinct)
+       (first)
+       (:a)))
+
 (defn control? [x]
   (and (map? x) (contains? x ::op)))
 
 (defn type-of-expr-at-point [{:keys [file top expr]}]
-  (let [expr (apply rdr/top-level-sexp file (first top) expr)]
-    expr
-    ))
+  (try
+    (let [expr (apply rdr/top-level-sexp file (first top) expr)
+          code (u/macroexpand-all expr)
+          [s [n t err :as expr]] (check code)]
+      (let [ftvs (base/ftv t)
+            sub  (sub-pretty-vars ftvs)
+            t'   (type/substitute t sub)
+            sigma (Forall. (base/ftv t') t')]
+        (find-mark n)))
+    (catch Throwable t
+      (println t))))
 
 (defn run-op [msg]
-  ((ns-resolve 'lift.middleware (::op msg)) msg))
+  (try
+    ((ns-resolve 'lift.middleware (::op msg)) msg)
+    (catch Throwable t
+      (println "Run op encountered an Exception")
+      (println t))))
 
 (defn eval-handler [handler {:keys [op ns code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))

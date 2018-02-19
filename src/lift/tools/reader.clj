@@ -3,7 +3,9 @@
    [clojure.tools.reader :as r]
    [clojure.tools.reader.reader-types :as rt :refer [to-pbr]]
    [clojure.java.io :as io]
-   [clojure.string :as string]))
+   [clojure.string :as string])
+  (:import
+   [lift.lang.type.base Mark]))
 
 (deftype SyntaxMarkingPushbackReader
     [rdr
@@ -85,5 +87,5 @@
                     (rt/indexing-push-back-reader)
                     (syntax-marking-push-back-reader mark-line mark-col))]
     (drop-lines (dec line) r)
-    (binding [r/*data-readers* {'mark (fn [x] `(mark ~x))}]
+    (binding [r/*data-readers* {'mark (fn [x] (Mark. x))}]
       (r/read r))))

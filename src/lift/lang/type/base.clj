@@ -110,6 +110,8 @@
   Ftv     (-ftv  [_]   (set (apply concat xs)))
   Show    (-show [_]   (format "[%s]" (string/join " " xs))))
 
+(impl/deftype (Mark a))
+
 (impl/deftype (Literal a)
   Functor (-map [x _] x)
   Show    (-show [_] (pr-str a)))
@@ -192,7 +194,7 @@
   `(do (import ~@`[Env Substitution]) nil))
 
 (defmacro import-syntax-types []
-  `(do (import ~@`[Literal Symbol Key Lambda Apply Let If Prim SyntaxNode Curry]) nil))
+  `(do (import ~@`[Literal Symbol Key Lambda Apply Let If Prim SyntaxNode Curry Mark]) nil))
 
 (defmacro import-type-types []
   (let [types `[Unit Const Var Vargs Arrow Forall Predicate Predicated New]]

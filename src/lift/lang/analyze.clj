@@ -24,6 +24,9 @@
 (defn class-name? [x]
   (and (symbol? x) (not (prim? x)) (class? (resolve x))))
 
+(defn mark? [x]
+  (instance? Mark x))
+
 (s/def ::literal
   (s/or :Boolean  boolean?
         :Int      integer?
@@ -61,7 +64,7 @@
                 :vs (s/+ (s/and seq? (s/cat :bind ::arglist :expr any?))))))
 
 (s/def ::record-selection
-  (s/and seq? (s/cat :op keyword? :arg ::record-expr)))
+  (s/and seq? (s/cat :op (s/or :k keyword? :m mark?) :arg ::record-expr)))
 
 (s/def ::record-extension
   (s/and seq? (s/cat :op #{'assoc}
@@ -196,13 +199,15 @@
 (defmethod -parse :Fun [_ f] f)
 
 (defn parse [expr]
-  (let [conformed (s/conform ::expr expr)]
-    (cond (s/invalid? conformed)
-          (if (instance? Type expr)
-            expr
-            (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
-                            (s/explain-data ::expr expr))))
-          (= :Def (first conformed))
-          (ana parse (nth expr 2))
-          :default
-          ($ (-parse (first conformed) expr) nil nil (meta expr)))))
+  (if (instance? Mark expr)
+    ($ (parse (:a expr)) nil nil {:mark true})
+    (let [conformed (s/conform ::expr expr)]
+      (cond (s/invalid? conformed)
+            (if (instance? Type expr)
+              expr
+              (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
+                              (s/explain-data ::expr expr))))
+            (= :Def (first conformed))
+            (ana parse (nth expr 2))
+            :default
+            ($ (-parse (first conformed) expr) nil nil (meta expr))))))

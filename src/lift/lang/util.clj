@@ -2,7 +2,9 @@
   (:refer-clojure :exclude [macroexpand])
   (:require
    [clojure.spec.alpha :as s]
-   [riddley.compiler :as cmp]))
+   [riddley.compiler :as cmp])
+  (:import
+   [lift.lang.type.base Mark]))
 
 (defn ns-qualify
   "Qualify symbol s by resolving it or using the current *ns*."
@@ -218,6 +220,12 @@
                    x))
              walk-exprs' (partial walk-exprs predicate handler special-form?)
              x' (cond
+
+                  (instance? Mark x)
+                  (let [x'' (walk-exprs' (:a x))]
+                    (if (instance? clojure.lang.IObj x'')
+                      (vary-meta x'' assoc :mark true)
+                      x''))
 
                   (and (seq? x) (= 'var (first x)) (predicate x))
                   (handler (eval x))

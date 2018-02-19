@@ -189,6 +189,8 @@
   ([_Gamma [SyntaxNode n t e m]]
    (let [[s1 [e1 t1]] (n _Gamma)] [s1 (base/$ e1 t1 e m)]))
 
+  ([_Gamma [Mark a]] (a _Gamma))
+
   ([_ x]
    (throw (Exception. (str "Unrecognized syntax: " (pr-str x))))))
 
