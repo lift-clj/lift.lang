@@ -84,11 +84,11 @@
        '~t)))
 
 (defn impl [[tag & as] impls]
-  (let [consts (map #(Const. %) as)
+  (let [consts (mapv #(Const. %) as)
         tag-ts (map #(or (@t/type-env %) (Const. %)) as)
         [_ bs] (get @t/type-env tag)
         pred   (Predicate. tag consts)
         sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]
     `(do
        (swap! t/type-env assoc ~pred ~(sig/impl pred sub impls))
-       (list ~pred))))
+       '~pred)))

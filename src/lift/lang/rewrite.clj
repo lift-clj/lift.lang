@@ -6,7 +6,9 @@
    [lift.lang.type.base :as base]
    [lift.lang.util :as u]
    [lift.lang.type.impl :as impl]
-   [lift.lang.analyze :as ana])
+   [lift.lang.analyze :as ana]
+   [lift.lang.type :as type]
+   [lift.lang.unification :as unify])
   (:import
    [clojure.lang Fn IPersistentMap]
    [lift.lang.inference InferError]))
@@ -20,14 +22,46 @@
 (extend-protocol f/Functor
   clojure.lang.Fn (-map [x f] x))
 
+;; (get @type/type-env 'Maybe)
+;; (get @type/type-env 'Eq)
+
+;; (unify/unify (Container. 'Maybe [(Var. 'a)])
+;;              (Container. 'Maybe [(Const. 'Long)]))
+
+(p/defn unify-predicate
+  ([[Predicate t a] [Predicate t' a']]
+   (if (and (= t t') (= (count a) (count a')))
+     (if (= a a')
+       type/id
+       (->> (map (fn [a a'] [(:a a') a]) a a')
+            (into {})
+            (type/sub))))))
+
 (p/defn -rewrite
   ([_Gamma sub [SyntaxNode
-       [Symbol f]
-       [Predicated [[Predicate _ as :as p]] [Arrow :as t]] :as syn]]
+           [Symbol f]
+           [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
    (if (infer/concrete-instance? p)
-     (let [p (infer/concrete-instance p)]
-       (-> _Gamma (get p) (get (u/resolve-sym f)) (->> (rewrite _Gamma sub))))
-     (Curry. (resolve f))))
+     (let [[_ as' :as inst] (infer/concrete-instance p)
+           sub' (or (some->> (map (comp _Gamma :x) as')
+                             (remove nil?)
+                             (seq)
+                             (map unify/unify as)
+                             (#(doto % prn))
+                             (reduce unify/compose)
+                             (unify/compose sub))
+                    sub)
+           code (-> (get _Gamma inst)
+                    (get (u/resolve-sym f))
+                    (type/substitute sub'))]
+       (rewrite _Gamma sub code))
+     (let [[m :as psub] (unify-predicate (_Gamma ptag) p)
+           _ (prn psub)
+           sub' (unify/compose sub psub)
+           syn' (type/substitute syn sub')]
+       (if (not= syn syn')
+         (rewrite _Gamma sub' syn')
+         (Curry. (resolve f))))))
   ([_ _ [SyntaxNode [Apply [Lambda :as e1] e2] [Arrow _]]]
    (Apply. e1 e2))
   ([_ _ [SyntaxNode [Apply e1 e2] [Arrow _]]]
