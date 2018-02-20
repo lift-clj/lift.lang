@@ -77,6 +77,10 @@
     ([Nothing   Nothing] True)
     ([_         _      ] False)))
 
+(impl (Eq Pair)
+  (=
+    ([(Pair a b) (Pair c d)] (if (= a b) (= c d) False))))
+
 ;; TODO: Eq Maybe is correct, Eq (Maybe a) is odd
 
 (interface (Read a)

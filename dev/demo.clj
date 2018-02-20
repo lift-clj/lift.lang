@@ -7,9 +7,11 @@
   (:require [lift.lang :refer :all]
             [lift.lang.inference :as infer]))
 
-(= (Just (Just 1)) (Just (Just 1)))
+(= (Just (Just (Just 1))) (Just (Just (Just 1))))
 
-;; (_? (Just 1) (Just 1))
+;; (= (Pair 1 2) (Pair 3 4))
+
+(_? (Just 1) (Just 1))
 
 ;; '(1 2 3)
 

@@ -37,31 +37,25 @@
             (into {})
             (type/sub))))))
 
-(@type/type-env 'Eq)
+;; (@type/type-env 'Eq)
 (p/defn -rewrite
   ([_Gamma sub [SyntaxNode
            [Symbol f]
            [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
    (if (infer/concrete-instance? p)
      (let [[_ as' :as inst] (infer/concrete-instance p)
-           sub' (or (some->> (map (comp _Gamma :x) as')
-                             (remove nil?)
-                             (seq)
-                             (map unify/unify as)
-                             (#(doto % prn))
-                             (reduce unify/compose)
-                             (unify/compose sub))
-                    sub)
+           [sub'] (some->> (map (comp _Gamma :x) as')
+                           (remove nil?)
+                           (seq)
+                           (map unify/unify as)
+                           (reduce unify/compose))
+           sub' (if (seq sub') (type/sub (merge (:s sub) sub')) sub)
            code (-> (get _Gamma inst)
                     (get (u/resolve-sym f))
                     (type/substitute sub'))]
-       (prn p )
-       (prn inst)
-       (rewrite _Gamma sub code))
+       (rewrite _Gamma sub' code))
      (let [[m :as psub] (unify-predicate (_Gamma ptag) p)
-           _ (prn psub)
            sub' (unify/compose sub psub)
-           _ (prn 'sub' sub')
            syn' (type/substitute syn sub')]
        (if (not= syn syn')
          (rewrite _Gamma sub' syn')

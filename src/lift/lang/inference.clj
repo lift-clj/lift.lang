@@ -65,7 +65,8 @@
   ([[Predicate _ as :as p]]
    (every? concrete-instance? as))
   ([[Container tag args]]
-   (every? concrete-instance? args))
+   true ;;(every? concrete-instance? args)
+   )
   ([[Const _]] true)
   ([_] false))
 

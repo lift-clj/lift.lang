@@ -185,7 +185,8 @@
     (t/substitute (base/$ e t) s)))
 
 (defn check-lambda [_Gamma bindings types e]
-  (let [_Gamma (apply assoc _Gamma (interleave bindings types))
+  (let [types' (map (fn [a] (Forall. (base/ftv a) a)) types)
+        _Gamma (apply assoc _Gamma (interleave bindings types'))
         [s [_ t :as e]] (infer/checks _Gamma e)
         [p1 t1] (infer/release t)
         pts (map #(infer/release (t/substitute % s)) (reverse types))
@@ -208,19 +209,13 @@
                          impls))
         code     (u/macroexpand-all code)
         [s1 syn] (check-lambda _Gamma vs arg-ts code)
-        ;; s2       (unify ts (:t syn))
-        ;; _ (prn s2)
         [e t]    (t/substitute syn s1)
         [as pt]  (get _Gamma f)
         _ (assert pt (format "Symbol %s not found in env" f))
         [ps t'] pt
         _ (assert t')
-        ;; _ (prn e t)
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
         [_ t]   (infer/release t)]
-    ;; (prn e)
-    ;; (prn t)
-    ;; (prn s1)
     (t/substitute (base/$ e t) s)))
 
 (defn impl [pred sub impls]
