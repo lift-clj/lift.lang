@@ -12,6 +12,7 @@
 (type/def instance? (Class -> a -> Boolean))
 (type/def inc       (Long -> Long))
 (type/def pos?      (Long -> Boolean))
+(type/def not       (Boolean -> Boolean))
 (type/def str       (a -> String))
 ;; (type/def nth       (Vector a -> Long -> a))
 (type/def double    (Ratio -> Double))
@@ -70,11 +71,11 @@
 (impl (Eq String)
   (= [x y] (prim/=String x y)))
 
-(impl (Eq Maybe)
-  (=
-    ([(Just x) (Just y)] (= x y))
-    ([Nothing   Nothing] True)
-    ([_         _      ] False)))
+;; (impl (Eq Maybe)
+;;   (=
+;;     ([(Just x) (Just y)] (= x y))
+;;     ([Nothing   Nothing] True)
+;;     ([_         _      ] False)))
 
 ;; TODO: Eq Maybe is correct, Eq (Maybe a) is odd
 

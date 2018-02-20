@@ -96,14 +96,25 @@
 (defn def? [expr]
   (and (seq? expr) (= 'def (first expr))))
 
+(defn type-check-error [[msg {:keys [file line column expr] :as x} :as infer-err]]
+  (prn 'infer-err infer-err )
+  (throw
+   (clojure.lang.Compiler$CompilerException.
+    (or file (pr-str expr))
+    (or line 0)
+    (or column 0)
+    (Exception. msg))))
+
 (defn lift [expr]
+  (prn 'lift expr)
   (try
     (if (and (seq? expr) (ignore? expr))
       (c/eval expr)
       (let [code (u/macroexpand-all expr)
             [s [_ t err :as expr]] (check code)]
-        (if err
-          (throw (Exception. (str (pr-str expr) "\n" (string/join "\n" err))))
+        (prn 'err err code expr)
+        (if (seq err)
+          (throw (type-check-error (first err)))
           (let [ftvs (base/ftv t)
                 sub  (sub-pretty-vars ftvs)
                 ret  (->> expr
@@ -120,7 +131,7 @@
               (base/$ (c/eval ret) t'))))))
     (catch Throwable t
       (prn t)
-      t)))
+      (throw t))))
 
 (defn type-of-symbol [expr]
   (when-let [t (and (symbol? expr)
@@ -201,29 +212,40 @@
       (first t?))))
 
 (defn run-op [msg]
+  (prn ::op (::op msg))
   (try
     ((ns-resolve 'lift.middleware (::op msg)) msg)
     (catch Throwable t
       (println "Run op encountered an Exception")
       (println t))))
 
-(defn eval-handler [handler {:keys [op ns code] :as msg}]
+(defn read-code [{:keys [op ns file-name expr-pos code] :as msg}]
+  (let [[line] expr-pos
+        rdr   (some-> code
+                      (cond->> line
+                        (str (apply str (repeat (dec line) \newline))))
+                      (java.io.StringReader.)
+                      (rt/indexing-push-back-reader 1 file-name))]
+    (if (= op "eval") [(r/read rdr)] code)))
+
+(defn eval-handler [handler {:keys [op ns file-name expr-pos code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
-        code  (r/read-string code)]
-    (if (control? code)
-      (handler (assoc msg :eval `identity :code [(run-op code)]))
-      (let [eval  (case op "eval" `lift "load-file" `lift)]
+        [line col] expr-pos
+        code (read-code msg)]
+    (if (control? (first code))
+      (handler (assoc msg :eval `identity :code [(run-op (first code))]))
+      (let [eval (case op "eval" `lift "load-file" `lift)]
         (if lift?
-          (-> (assoc msg :eval eval)
+          (-> (assoc msg :eval eval :code code)
               (cond-> (= op "load-file") (dissoc :ns))
               (handler))
           (handler msg))))))
 
 (defn repl-fn [handler {:keys [op code ns file column line] :as msg}]
   (cond
-    (= "load-file" op) (eval-handler handler msg)
-    (= "eval" op)      (eval-handler handler msg)
-    (= "type" op)      (eval-handler handler msg)
+    (= "load-file" op) (#'eval-handler handler msg)
+    (= "eval" op)      (#'eval-handler handler msg)
+    (= "type" op)      (#'eval-handler handler msg)
     :else (handler msg)))
 
 (defn repl [handler]

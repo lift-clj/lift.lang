@@ -8,7 +8,8 @@
    [lift.lang.type.impl :as impl]
    [lift.lang.analyze :as ana])
   (:import
-   [clojure.lang Fn IPersistentMap]))
+   [clojure.lang Fn IPersistentMap]
+   [lift.lang.inference InferError]))
 
 (base/import-container-types)
 (base/import-syntax-types)
@@ -58,6 +59,7 @@
   ([[Map r]] r)
   ([[Prim f]] f)
   ([[Curry f]] `(fn* [x#] (partial ~f x#)))
+  ([[InferError e m]] `(InferError. ~e ~m))
   ([expr]
    (if (var? expr)
      expr

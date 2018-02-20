@@ -17,6 +17,10 @@
 (base/import-type-types)
 (base/import-syntax-types)
 
+(impl/deftype (InferError e m)
+  f/Functor
+  (f/-map [x _] x))
+
 (defn xi? [x]
   (and (symbol? x) (= \ξ(first (name x)))))
 
@@ -206,7 +210,13 @@
   ([_Gamma [Prim f t]] [id (Prim. f (instantiate t))])
 
   ([_Gamma [SyntaxNode n t e m]]
-   (let [[s1 [e1 t1]] (n _Gamma)] [s1 (base/$ e1 t1 e m)]))
+   (try
+     (let [[s1 [e1 t1]] (n _Gamma)
+           errs (filterv identity (mapcat :e (impl/-vec e1)))]
+       [s1 (base/$ e1 t1 errs m)])
+     (catch Throwable t
+       (let [err (InferError. (.getMessage t) m)]
+         [id (base/$ err (Var. 'a) [err] m)]))))
 
   ([_Gamma [Mark a]] (a _Gamma))
 

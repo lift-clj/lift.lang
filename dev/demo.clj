@@ -8,9 +8,16 @@
             [lift.lang.inference :as infer]))
 
 ;; (_? (Just 1) (Just 1))
+
 ;; '(1 2 3)
 
 ;; [1 "" 3]
+
+;; (= 1 (coerce "1"))
+
+;; (not (pos? 1))
+
+;; (not (pos? "this is a string, fool"))
 
 ;; (= 1 (coerce "1"))
 
