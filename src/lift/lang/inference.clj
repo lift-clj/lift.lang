@@ -123,7 +123,6 @@
                 [id []]
                 coll)
         s2 (unify/unify-coll (map :t coll'))
-        _ (prn coll' s2)
         t2 (if (seq coll')
              (-> coll' first :t (t/substitute s2))
              (Var. (gensym 'a)))]
@@ -212,7 +211,10 @@
   ([_Gamma [SyntaxNode n t e m]]
    (try
      (let [[s1 [e1 t1]] (n _Gamma)
-           errs (filterv identity (mapcat :e (impl/-vec e1)))]
+           errs (->> (impl/-vec e1)
+                     (filter #(instance? SyntaxNode %))
+                     (mapcat :e)
+                     (filterv identity))]
        [s1 (base/$ e1 t1 errs m)])
      (catch Throwable t
        (let [err (InferError. (.getMessage t) m)]

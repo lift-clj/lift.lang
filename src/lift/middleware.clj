@@ -97,7 +97,6 @@
   (and (seq? expr) (= 'def (first expr))))
 
 (defn type-check-error [[msg {:keys [file line column expr] :as x} :as infer-err]]
-  (prn 'infer-err infer-err )
   (throw
    (clojure.lang.Compiler$CompilerException.
     (or file (pr-str expr))
@@ -106,13 +105,11 @@
     (Exception. msg))))
 
 (defn lift [expr]
-  (prn 'lift expr)
   (try
     (if (and (seq? expr) (ignore? expr))
       (c/eval expr)
       (let [code (u/macroexpand-all expr)
             [s [_ t err :as expr]] (check code)]
-        (prn 'err err code expr)
         (if (seq err)
           (throw (type-check-error (first err)))
           (let [ftvs (base/ftv t)
@@ -130,7 +127,6 @@
                   (base/$ (resolve v) t')))
               (base/$ (c/eval ret) t'))))))
     (catch Throwable t
-      (prn t)
       (throw t))))
 
 (defn type-of-symbol [expr]
@@ -178,8 +174,7 @@
                 sigma (Forall. (base/ftv t') t')]
             (find-mark expr))))
     (catch Throwable t
-      (prn t)
-      t)))
+      (throw t))))
 
 (def impl-namespaces
   (->> '[lift.lang.case
