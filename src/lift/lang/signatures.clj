@@ -166,6 +166,11 @@
 
 (defn q1 [x] (list 'quote x))
 
+(defn arrseq [f]
+  (if (instance? Arrow f)
+    (cons (:a f) (arrseq (:b f)))
+    ()))
+
 (defn default-impl [pred sub {:keys [f arglist expr]}]
   (let [f       (u/resolve-sym f)
         _Gamma       (assoc @t/type-env pred ::temp)
@@ -179,25 +184,43 @@
         [_ t]   (infer/release t)]
     (t/substitute (base/$ e t) s)))
 
+(defn check-lambda [_Gamma bindings types e]
+  (let [_Gamma (apply assoc _Gamma (interleave bindings types))
+        [s [_ t :as e]] (infer/checks _Gamma e)
+        [p1 t1] (infer/release t)
+        pts (map #(infer/release (t/substitute % s)) (reverse types))
+        ps  (cons p1 (map first pts))
+        t2  (reduce #(Arrow. %2 %) t1 (map second pts))
+        e2  (reduce #(Lambda. (Symbol. %2) %) e bindings)]
+    [s (base/$ e2 (infer/with-pred _Gamma ps t2))]))
+
 (defn match-impl [pred sub {:keys [f impls]}]
   (let [n       (count (:arglist (first impls)))
         vs      (defn/vars n)
         f       (u/resolve-sym f)
         _Gamma       (assoc @t/type-env pred ::temp)
-        code    `(fn [~@vs]
-                   ~(case/case*
-                     (case/tuple n vs)
-                     (mapcat (fn [{:keys [arglist expr]}]
-                               `[~(case/tuple n arglist) ~expr])
-                             impls)))
-        code    (u/macroexpand-all code)
-        [e t]   (check code)
-        [as pt] (get _Gamma f)
+        ts      (@t/type-env f)
+        arg-ts  (arrseq (:t (t/substitute (:t ts) sub)))
+        code    (case/case*
+                 (case/tuple n vs)
+                 (mapcat (fn [{:keys [arglist expr]}]
+                           `[~(case/tuple n arglist) ~expr])
+                         impls))
+        code     (u/macroexpand-all code)
+        [s1 syn] (check-lambda _Gamma vs arg-ts code)
+        ;; s2       (unify ts (:t syn))
+        ;; _ (prn s2)
+        [e t]    (t/substitute syn s1)
+        [as pt]  (get _Gamma f)
         _ (assert pt (format "Symbol %s not found in env" f))
         [ps t'] pt
         _ (assert t')
+        ;; _ (prn e t)
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
         [_ t]   (infer/release t)]
+    ;; (prn e)
+    ;; (prn t)
+    ;; (prn s1)
     (t/substitute (base/$ e t) s)))
 
 (defn impl [pred sub impls]
@@ -208,8 +231,3 @@
                 :default (partial default-impl pred sub)
                 :match   (partial match-impl pred sub))]
     (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
-
-(defn arrseq [f]
-  (if (instance? Arrow f)
-    (cons (:a f) (arrseq (:b f)))
-    ()))

@@ -242,3 +242,8 @@
   ([env expr]
    (let [[s ast] ((hylo -infer-ann-err ana/parse expr) env)]
      (t/substitute ast s))))
+
+(defn checks
+  ([expr] (checks @t/type-env expr))
+  ([env expr]
+   ((hylo -infer-ann-err ana/parse expr) env)))

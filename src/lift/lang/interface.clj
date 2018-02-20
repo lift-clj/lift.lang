@@ -86,6 +86,7 @@
 (defn impl [[tag & as] impls]
   (let [consts (mapv #(Const. %) as)
         tag-ts (map #(or (@t/type-env %) (Const. %)) as)
+        ;; _ (prn 'tag-ts tag-ts)
         [_ bs] (get @t/type-env tag)
         pred   (Predicate. tag consts)
         sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]

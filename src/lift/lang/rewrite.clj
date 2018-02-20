@@ -37,6 +37,7 @@
             (into {})
             (type/sub))))))
 
+(@type/type-env 'Eq)
 (p/defn -rewrite
   ([_Gamma sub [SyntaxNode
            [Symbol f]
@@ -54,10 +55,13 @@
            code (-> (get _Gamma inst)
                     (get (u/resolve-sym f))
                     (type/substitute sub'))]
+       (prn p )
+       (prn inst)
        (rewrite _Gamma sub code))
      (let [[m :as psub] (unify-predicate (_Gamma ptag) p)
            _ (prn psub)
            sub' (unify/compose sub psub)
+           _ (prn 'sub' sub')
            syn' (type/substitute syn sub')]
        (if (not= syn syn')
          (rewrite _Gamma sub' syn')
