@@ -96,22 +96,23 @@
 (defn def? [expr]
   (and (seq? expr) (= 'def (first expr))))
 
-(defn type-check-error [[msg {:keys [file line column expr] :as x} :as infer-err]]
+(defn type-check-error
+  [[msg {:keys [file line column expr] :as x} :as infer-err] top-meta]
   (throw
    (clojure.lang.Compiler$CompilerException.
-    (or file (pr-str expr))
-    (or line 0)
-    (or column 0)
+    (or file (:file top-meta) (pr-str expr))
+    (or line (:line top-meta) 0)
+    (or column (:column top-meta) 0)
     (Exception. msg))))
 
-(defn lift [expr]
+(defn lift [top-level-expr]
   (try
-    (if (and (seq? expr) (ignore? expr))
-      (c/eval expr)
-      (let [code (u/macroexpand-all expr)
+    (if (and (seq? top-level-expr) (ignore? top-level-expr))
+      (c/eval top-level-expr)
+      (let [code (u/macroexpand-all top-level-expr)
             [s [_ t err :as expr]] (check code)]
         (if (seq err)
-          (throw (type-check-error (first err)))
+          (throw (type-check-error (first err) (meta top-level-expr)))
           (let [ftvs (base/ftv t)
                 sub  (sub-pretty-vars ftvs)
                 ret  (->> expr
