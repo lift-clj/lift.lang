@@ -5,7 +5,7 @@
    [lift.f.functor :as f :refer [Functor]]
    [clojure.set :as set])
   (:import
-   [clojure.lang ISeq IPersistentMap]))
+   [clojure.lang ISeq IPersistentList IPersistentMap]))
 
 (defn ana [f x]
   (f/map #(ana f %) (f x)))
@@ -32,6 +32,8 @@
                   (string/join ", ")
                   (format "{%s}")))
   ISeq
+  (-show [x] (pr-str x))
+  IPersistentList
   (-show [x] (pr-str x)))
 
 

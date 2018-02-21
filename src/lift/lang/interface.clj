@@ -106,9 +106,7 @@
         consts (mapv #(Const. %) as)
         tag-ts (map #(or (some-> (t/find-type @t/type-env %) infer/instantiate)
                          (Const. %)) as)
-        _ (prn 'tag-ts tag-ts)
         [_ bs] (get @t/type-env tag)
-        _ (prn 'bs bs)
         pred   (Predicate. tag consts)
         sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]
     `(do

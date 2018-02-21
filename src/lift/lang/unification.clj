@@ -52,18 +52,16 @@
                  (reduce (fn [s [t1 t2]] (compose (trampoline unify t1 t2) s))
                          s1)))]
     (if (= (count t1-args) (count t2-args))
-      (do
-        (prn 'ttt (type tag1) (type tag2))
-        (if (= tag1 tag2)
-         (unify-args id)
-         (cond (and (instance? Var tag1) (instance? Var tag2))
-               (unify-args (unify tag1 tag2))
-               (instance? Var tag1)
-               (unify-args (unify tag1 (Const. tag2)))
-               (instance? Var tag2)
-               (unify-args (unify (Const. tag1) tag2))
-               :else
-               (u/unification-failure t1 t2))))
+      (if (= tag1 tag2)
+        (unify-args id)
+        (cond (and (instance? Var tag1) (instance? Var tag2))
+              (unify-args (unify tag1 tag2))
+              (instance? Var tag1)
+              (unify-args (unify tag1 (Const. tag2)))
+              (instance? Var tag2)
+              (unify-args (unify (Const. tag1) tag2))
+              :else
+              (u/unification-failure t1 t2)))
       (u/arity-error t1 t2))))
 
 (defn unify-coll [coll]

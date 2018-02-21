@@ -187,7 +187,6 @@
   (let [f        (u/resolve-sym f)
         _Gamma        (assoc @t/type-env pred ::temp)
         code     (u/macroexpand-all code)
-        _ (prn code)
         [s1 syn] (infer/checks _Gamma code)
         [e t]    (t/substitute syn s1)
         [as pt]  (get _Gamma f)
@@ -196,7 +195,6 @@
         _        (assert t')
         sigma    (t/substitute (infer/instantiate (Forall. as t')) sub)
         [s p]    (rel-unify _Gamma t sigma)
-        _        (prn t' sub)
         [_ t]    (infer/release t)]
     (t/substitute (base/$ e t) s)))
 

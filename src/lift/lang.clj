@@ -150,3 +150,15 @@
 
 (impl (Functor Vector)
   (map [f xs] (prim/mapVector f xs)))
+
+(interface (Monad m)
+  (return (a -> m a))
+  (>>=    (m a -> (a -> m b) -> m b))
+  (>>     (m a -> m b -> m b)))
+
+(impl (Monad Maybe)
+  (return
+    ([a] (Just a)))
+  (>>=
+    ([(Just x) f] (f x))
+    ([Nothing  _] Nothing)))

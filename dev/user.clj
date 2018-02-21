@@ -1,20 +1,10 @@
 (ns user
-  (:refer-clojure :exclude [case = not= read])
+  (:refer-clojure :exclude [+ * - / = case defn map name read not=])
   (:require
    ;; [clojure.core :as c]
    ;; [clojure.pprint :refer [pprint]]
    [clojure.tools.namespace.repl :refer [refresh]]
-   [lift.lang :refer :all]
-   [lift.lang.analyze :as ana]
-   [lift.lang.inference :refer [check -infer infer]]
-   [lift.lang.rewrite :refer [-emit emit -rewrite rewrite]]
-   [lift.lang.signatures :as sig]
-   [lift.lang.type :as t :refer [id]]
-   [lift.lang.type.base :as base]
-   [lift.lang.type.impl :as impl]
-   [riddley.walk :as walk]
-   [lift.lang.type :as type]
-   [lift.f.functor :as f]))
+   [lift.lang :refer :all]))
 
 ;; (base/import-syntax-types)
 ;; (base/import-type-types)

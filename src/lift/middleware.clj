@@ -110,8 +110,6 @@
       (c/eval expr)
       (let [code (u/macroexpand-all expr)
             [s [_ t err :as expr]] (check code)]
-        (prn code)
-        (prn err)
         (if (seq err)
           (throw (type-check-error (first err)))
           (let [ftvs (base/ftv t)
@@ -127,7 +125,8 @@
                       sigma (Forall. (base/ftv t') t')]
                   (swap! type/type-env assoc v sigma)
                   (base/$ (resolve v) t')))
-              (base/$ (c/eval ret) t'))))))
+              (let [ret' (pr-str (c/eval ret))]
+                (base/$ ret' t')))))))
     (catch Throwable t
       (throw t))))
 
@@ -203,13 +202,11 @@
 
 (defn type-replace-expr-at-point [msg]
   (let [t? (type-search-expr-at-point msg)]
-    (prn (first t?))
     (if (instance? Throwable t?)
       (throw t?)
       (first t?))))
 
 (defn run-op [msg]
-  (prn ::op (::op msg))
   (try
     ((ns-resolve 'lift.middleware (::op msg)) msg)
     (catch Throwable t

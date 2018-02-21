@@ -3,14 +3,16 @@
 
 (ns demo
   {:lang :lift/clojure}
-  (:refer-clojure :exclude [+ * - / = case defn name read not=])
-  (:require [lift.lang :refer :all]
-            [lift.lang.inference :as infer]))
+  (:refer-clojure :exclude [+ * - / = case defn map name read not=])
+  (:require [lift.lang :refer :all]))
 
-(map inc (Just 1))
-(map inc '(1 2 3))
 
-(map inc [1 2 3])
+(>>= (Just 1) (fn [a] (Just (inc a))))
+
+;; (map inc (Just 1))
+;; (map inc '(1 2 3))
+
+;; (map inc [1 2 3])
 
 ;; (= (Just (Just (Just 1))) (Just (Just (Just 1))))
 

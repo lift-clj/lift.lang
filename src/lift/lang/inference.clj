@@ -47,8 +47,6 @@
 (defn instantiate [[as t :as x]]
   (let [vars  (mapv (comp #(Var. %) gensym symhead) as)
         subst (t/sub (zipmap as vars))]
-    ;; (prn 'here vars x)
-    ;; (prn t)
     (t/substitute t subst)))
 
 (defn generalize [env t]
@@ -82,7 +80,6 @@
   ([x] x))
 
 (defn release? [_Gamma p]
-  (prn 'p p)
   (let [p (if (concrete-instance? p)
             (concrete-instance p)
             p)]
@@ -118,8 +115,6 @@
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
-    (prn 'a 'b a b)
-    (prn 'ps ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 

@@ -45,10 +45,6 @@
            [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
    (if (infer/concrete-instance? p)
      (let [[_ as' :as inst] (infer/concrete-instance p)
-           _ (prn 'p p)
-           _ (prn 'as as (map type as))
-           _ (prn 'as' as' inst)
-           ;; (throw as' are unresolved)
            [sub'] (some->> (map (fn [a a']
                                    (when-not (instance? Const a)
                                      (unify/unify a (:t (type/find-type _Gamma (:x a'))))))
@@ -56,19 +52,14 @@
                            (remove nil?)
                            (seq)
                            (reduce unify/compose))
-           ;; _ (prn 'sub' sub')
            sub' (if (seq sub') (type/sub (merge (:s sub) sub')) sub)
            code (-> (get _Gamma inst)
                     (get (u/resolve-sym f))
                     (type/substitute sub'))]
        (rewrite _Gamma sub' code))
      (let [[m :as psub] (unify-predicate p (type/get-type _Gamma ptag))
-           ;; _ (prn 'lkup ptag (type ptag) (lookup-type _Gamma ptag))
            sub' (unify/compose sub psub)
-           ;; _ (prn 'psub p ptag psub)
-           ;; _ (prn 'sub' sub')
            syn' (type/substitute syn sub')]
-       ;; (prn 'syn' syn')
        (if (not= syn syn')
          (rewrite _Gamma sub' syn')
          (Curry. (resolve f))))))
