@@ -162,3 +162,21 @@
   (>>=
     ([(Just x) f] (f x))
     ([Nothing  _] Nothing)))
+
+;; (data State s a = State h)
+
+;; (impl (Monad State)
+;;   (return
+;;     ([a] (State (fn [s] (Pair a s)))))
+;;   (>>=
+;;     ([(State h) f]
+;;      (State (fn [s]
+;;               (let [])
+;;               )))
+;;     )
+;;   )
+
+;; TODO: State monad needs:
+;; typed let destructuring
+;; record function type constructor syntax
+;; vector as tuple syntax

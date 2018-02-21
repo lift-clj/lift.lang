@@ -124,6 +124,8 @@
                 (c/eval (list 'def name ret))
                 (let [v (u/resolve-sym name)
                       sigma (Forall. (base/ftv t') t')]
+                  (prn (meta top-level-expr))
+                  (prn v sigma)
                   (swap! type/type-env assoc v sigma)
                   (base/$ (resolve v) t')))
               (let [ret' (pr-str (c/eval ret))]
@@ -131,10 +133,10 @@
     (catch Throwable t
       (throw t))))
 
-(defn type-of-symbol [expr]
+(defn type-of-symbol [ns expr]
   (when-let [t (and (symbol? expr)
-                    (get @type/type-env (u/resolve-sym expr)))]
-    (base/$ (resolve expr) t)))
+                    (get @type/type-env (u/resolve-sym ns expr)))]
+    (base/$ (ns-resolve ns expr) t)))
 
 (defn type-of-type [expr]
   (try
@@ -155,7 +157,7 @@
 (defn control? [x]
   (and (map? x) (contains? x ::op)))
 
-(defn type-of-expr-at-point [{:keys [file]
+(defn type-of-expr-at-point [{:keys [file ns]
                               {[_ _ t :as tp] :pos top  :code} :top
                               {[_ _ e :as ep] :pos expr :code} :expr}]
   (try
@@ -163,7 +165,7 @@
              (ana/literal? expr)
              (base/$ (Literal. expr) (ana/type (Literal. expr))))
 
-        (type-of-symbol expr)
+        (type-of-symbol ns expr)
 
         (type-of-type expr)
 
@@ -228,7 +230,10 @@
         [line col] expr-pos
         code (read-code msg)]
     (if (control? (first code))
-      (handler (assoc msg :eval `identity :code [(run-op (first code))]))
+      (handler
+       (assoc msg
+              :eval `identity
+              :code [(run-op (-> code first (assoc :ns (symbol ns))))]))
       (let [eval (case op "eval" `lift "load-file" `lift)]
         (if lift?
           (-> (assoc msg :eval eval :code code)

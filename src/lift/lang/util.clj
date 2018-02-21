@@ -23,7 +23,7 @@
 
 (defn resolve-sym
   ([ns s]
-   (or (some-> s resolve ->sym) (ns-qualify s)))
+   (or (some->> s (ns-resolve ns) ->sym) (ns-qualify s)))
   ([s]
    (resolve-sym *ns* s)))
 

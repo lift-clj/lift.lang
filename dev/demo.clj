@@ -6,8 +6,10 @@
   (:refer-clojure :exclude [+ * - / = case defn map name read not=])
   (:require [lift.lang :refer :all]))
 
+;; automatic currying
+;; (map (+ 2) [1 2 3])
 
-(>>= (Just 1) (fn [a] (Just (inc a))))
+;; (>>= (Just 1) (fn [a] (Just (inc a))))
 
 ;; (map inc (Just 1))
 ;; (map inc '(1 2 3))
@@ -94,10 +96,10 @@
 
 ;; ;; ;; turn type-checking `ON`
 
-;; ;; ;; Don't need to run it
+;; Don't need to run it
 
-;; ;; (defn ill-typed-function [x]
-;; ;;   (+ x "string"))
+;; (defn ill-typed-function [x]
+;;   (+ x "string"))
 
 
 ;; ;; Extensible records, with row types
@@ -155,7 +157,7 @@
 
 ;; (defn deep-map-returning-fn [id]
 ;;   (-> {}
-;;       (assoc :a {:b {:c {:d 10}}})
+;;       (assoc :a {:b {:c {:d id}}})
 ;;       (assoc :e {:f {:g 30}})
 ;;       (assoc :h {:i "wut"})))
 
@@ -164,7 +166,7 @@
 ;; (deep-map-returning-fn 1142)
 
 
-;; ;; (:a (deep-map-returning-fn 1142))
+;; (:a (deep-map-returning-fn 1142))
 
 
 ;; (defn some-function [condition either-val]
@@ -183,20 +185,22 @@
 
 ;; ;; ;; Different logical interpreter
 
-;; ;; (def list-of-maybes
-;; ;;   (->> (list) (cons (Right 1)) (cons (Left {:something 2}))))
+(def list-of-maybes
+  (->> () (cons (Right 1)) (cons (Left {:something 2}))))
 
-;; ;; ;; Hole DD / type search
-;; ;; (map (partial _? true) list-of-maybes)
 
-;; ;; (def list-of-maybes-2
-;; ;;   (->> (list)
-;; ;;        (cons (Right "Err"))
-;; ;;        (cons (Left {:something "coffee"}))
-;; ;;        (cons (Right "Err2"))
-;; ;;        (cons (Left {:something "this"}))))
+;; Hole DD / type search
+(map (_? true) list-of-maybes)
 
-;; ;; (map (partial core/some-other-function true) list-of-maybes-2)
+(def list-of-maybes-2
+  (->> ()
+       (cons (Right "Err"))
+       (cons (Left {:something "coffee"}))
+       (cons (Right "Err2"))
+       (cons (Left {:something "this"}))))
+
+(map (_? true) list-of-maybes-2)
+;; TODO: refine this enough for only one function
 
 ;; ;; ;; Seen what Idris can do?
 

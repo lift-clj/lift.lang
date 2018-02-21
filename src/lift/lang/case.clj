@@ -145,10 +145,3 @@
                          nil))
             (default-case {:type :uerr :expr `(t/unmatched-case-error ~gs)})
             (emit-case)))))
-
-;; TODO: need vector destructuring to n-tuple
-;; (defn defn-match [name & param-exprs]
-;;   `(defn ~name
-;;      ~(case* )
-;;      )
-;;   )

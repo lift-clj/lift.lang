@@ -218,6 +218,7 @@
                      (filterv identity))]
        [s1 (base/$ e1 t1 errs m)])
      (catch Throwable t
+       (prn 'heer m)
        (let [err (InferError. (.getMessage t) m)]
          [id (base/$ err (Var. 'a) [err] m)]))))
 
