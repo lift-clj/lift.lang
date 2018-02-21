@@ -1,5 +1,5 @@
 (ns lift.lang
-  (:refer-clojure :exclude [+ * - / case defn name read = not=])
+  (:refer-clojure :exclude [+ * - / case defn map name read = not=])
   (:require
    [lift.lang.case :as case]
    [lift.lang.defn :as defn]
@@ -136,3 +136,14 @@
 
 (impl (Div Double)
   (/ [x y] (prim/divDouble x y)))
+
+(interface (Functor f)
+  (map ((a -> b) -> f a -> f b)))
+
+(impl (Functor Maybe)
+  (map
+    ([f (Just a)] (Just (f a)))
+    ([f  Nothing]  Nothing)))
+
+(impl (Functor List)
+  (map [f xs] (prim/mapList f xs)))

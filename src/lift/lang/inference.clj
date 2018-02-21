@@ -28,7 +28,8 @@
   ([[Predicate _ as]]
    (letfn [(can? [a]
              (or (instance? Const a)
-                 (and (instance? Var a) (xi? (:a a)))))]
+                 (and (instance? Var a) ;(xi? (:a a)) ;; TODO: this is probably wrong
+                      )))]
      (every? can? as)))
   ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
@@ -81,7 +82,7 @@
   ([x] x))
 
 (defn release? [_Gamma p]
-  ;; (prn p)
+  (prn 'p p)
   (let [p (if (concrete-instance? p)
             (concrete-instance p)
             p)]
@@ -117,6 +118,8 @@
                 (remove nil?)
                 (mapcat #(split-pred (t/substitute % s)))
                 (distinct))]
+    (prn 'a 'b a b)
+    (prn 'ps ps)
     (every? (partial release? _Gamma) ps)
     [s ps]))
 

@@ -47,13 +47,23 @@
     (compose s2 s1)))
 
 (defn unify-compound [t1 tag1 t1-args t2 tag2 t2-args]
-  (if (= tag1 tag2)
+  (letfn [(unify-args  [s1]
+            (->> (map vector t1-args t2-args)
+                 (reduce (fn [s [t1 t2]] (compose (trampoline unify t1 t2) s))
+                         s1)))
+          ]
     (if (= (count t1-args) (count t2-args))
-      (->> (map vector t1-args t2-args)
-           (reduce (fn [s [t1 t2]] (compose (trampoline unify t1 t2) s))
-                   id))
-      (u/arity-error t1 t2))
-    (u/unification-failure t1 t2)))
+      (if (= tag1 tag2)
+        (unify-args id)
+        (cond (and (instance? Var tag1) (instance? Var tag2))
+              (unify-args (unify tag1 tag2))
+              (instance? Var tag1)
+              (unify-args (unify tag1 (Const. tag2)))
+              (instance? Var tag2)
+              (unify-args (unify (Const. tag1) tag2))
+              :else
+              (u/unification-failure t1 t2)))
+      (u/arity-error t1 t2))))
 
 (defn unify-coll [coll]
   (reduce (fn [s [a b]] (compose (unify a b) s)) id (partition 2 1 coll)))

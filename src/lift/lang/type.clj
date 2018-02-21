@@ -34,6 +34,9 @@
 (defn get-type [_Gamma tag]
   (get _Gamma tag))
 
+(defmacro t [x]
+  `(get @type-env '~(u/resolve-sym x)))
+
 (defn ex-unknown-type [t]
   (throw (ex-info (format "Unknown Type %s" (pr-str t))
                   {:type ::unknown-type :t t})))

@@ -39,19 +39,22 @@
      type/id))
   ([_ _] type/id))
 
-(type/get-type @type/type-env 'Eq)
 (p/defn -rewrite
   ([_Gamma sub [SyntaxNode
            [Symbol f]
            [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
    (if (infer/concrete-instance? p)
      (let [[_ as' :as inst] (infer/concrete-instance p)
-           ;; _ (prn as')
+           _ (prn 'p p)
+           _ (prn 'as as (map type as))
+           _ (prn 'as' as' inst)
            ;; (throw as' are unresolved)
-           [sub'] (some->> (map #(:t (type/find-type _Gamma (:x %))) as')
+           [sub'] (some->> (map (fn [a a']
+                                   (when-not (instance? Const a)
+                                     (unify/unify a (:t (type/find-type _Gamma (:x a'))))))
+                                 as as')
                            (remove nil?)
                            (seq)
-                           (map unify/unify as)
                            (reduce unify/compose))
            ;; _ (prn 'sub' sub')
            sub' (if (seq sub') (type/sub (merge (:s sub) sub')) sub)

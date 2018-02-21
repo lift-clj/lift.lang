@@ -69,11 +69,33 @@
 (impl/deftype (New t))
 
 (impl/deftype (Container tag args)
-  Ftv  (-ftv [_] (set (apply concat args)))
+  Ftv  (-ftv [_] (union (if (instance? Var tag) #{(:a tag)} #{})
+                        (set (apply concat args))))
   Show (-show [_]
          (if args
-           (format "(%s %s)" (name tag) (string/join ", " args))
-           (name tag))))
+           (format "(%s %s)"
+                   (if (symbol? tag)
+                     (name tag)
+                     (impl/show tag))
+                   (string/join ", " args))
+           (name tag)))
+  Sub  (-sub [_ s]
+         (Container. (if (instance? Var tag)
+                       (if-let [sub (get s (:a tag))]
+                         (cond (instance? Container sub)
+                               (:tag sub)
+                               (instance? Var sub)
+                               sub
+                               :else
+                               sub #_(throw
+                                (Exception.
+                                 (format "Can't sub this %s / %s"
+                                         (pr-str tag)
+                                         (pr-str sub))))
+                               ) ;; TODO: should we sub here? instantiation needs this
+                         tag)
+                       tag)
+                     (args s))))
 
 (impl/deftype (RowEmpty)
   Ftv  (-ftv  [_] #{})

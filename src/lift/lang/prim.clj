@@ -50,3 +50,8 @@
 (defn  -Double   [x y] (- x y))
 (t/def divDouble (Double -> Double -> Double))
 (defn  divDouble [x y] (/ x y))
+
+(t/def mapList   ((a -> b) -> lift.lang/List a -> lift.lang/List b))
+(def   mapList   map)
+(t/def mapVector ((a -> b) -> lift.lang/Vector a -> lift.lang/Vector b))
+(def   mapVector mapv)

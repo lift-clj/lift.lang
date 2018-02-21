@@ -7,11 +7,14 @@
   (:require [lift.lang :refer :all]
             [lift.lang.inference :as infer]))
 
-(= (Just (Just (Just 1))) (Just (Just (Just 1))))
-(= (Just 1) (Just 1))
+;; (map inc (Just 1))
 
-;; (Just 1)
-(= (Pair 1 2) (Pair 1 2))
+;; (= (Just (Just (Just 1))) (Just (Just (Just 1))))
+
+;; (= (Just 1) (Just 1))
+
+;; ;; ;; (Just 1)
+;; (= (Pair 1 2) (Pair 1 2))
 
 ;; (Pair 1 2)
 
@@ -30,9 +33,9 @@
 
 ;; (= 1 (coerce "1"))
 
-;; ;; (case [Nothing 2]
-;; ;;   [(Just a) b] a
-;; ;;   [Nothing  _] 0)
+;; (case [Nothing 2]
+;;   [(Just a) b] a
+;;   [Nothing  _] 0)
 
 ;; ;; (t/def (List a))
 ;; ;; (t/def (Vector a))
