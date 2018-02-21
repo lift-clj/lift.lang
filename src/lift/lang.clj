@@ -147,3 +147,6 @@
 
 (impl (Functor List)
   (map [f xs] (prim/mapList f xs)))
+
+(impl (Functor Vector)
+  (map [f xs] (prim/mapVector f xs)))

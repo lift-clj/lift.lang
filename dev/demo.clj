@@ -7,7 +7,10 @@
   (:require [lift.lang :refer :all]
             [lift.lang.inference :as infer]))
 
-;; (map inc (Just 1))
+(map inc (Just 1))
+(map inc '(1 2 3))
+
+(map inc [1 2 3])
 
 ;; (= (Just (Just (Just 1))) (Just (Just (Just 1))))
 

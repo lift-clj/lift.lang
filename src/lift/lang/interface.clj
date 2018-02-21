@@ -87,10 +87,15 @@
 (def clojure-imports
   '#{Keyword Ratio Symbol})
 
+(def literal-containers
+  '#{List Vector})
+
 (defn resolve-type-param [a]
   (let [r (resolve a)]
     (cond (contains? clojure-imports a)
           a
+          (contains? literal-containers a)
+          (symbol "lift.lang" (name a))
           (class? r)
           (symbol (.getSimpleName r))
           :else
@@ -103,6 +108,7 @@
                          (Const. %)) as)
         _ (prn 'tag-ts tag-ts)
         [_ bs] (get @t/type-env tag)
+        _ (prn 'bs bs)
         pred   (Predicate. tag consts)
         sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]
     `(do

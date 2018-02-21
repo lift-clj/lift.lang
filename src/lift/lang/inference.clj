@@ -194,10 +194,10 @@
       ($ (Restrict. label r) (Record. (t/substitute btype s2)))]))
 
   ([_Gamma [List xs]]
-   (infer-coll _Gamma #(List. %) 'List xs))
+   (infer-coll _Gamma #(List. %) 'lift.lang/List xs))
 
   ([_Gamma [Vector xs]]
-   (infer-coll _Gamma #(Vector. %) 'Vector xs))
+   (infer-coll _Gamma #(Vector. %) 'lift.lang/Vector xs))
 
   ([_Gamma [Map m]]
    (let [[s1 vals] (reduce (fn [[s2 es] e]

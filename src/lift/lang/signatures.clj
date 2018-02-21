@@ -172,19 +172,6 @@
     (cons (:a f) (arrseq (:b f)))
     ()))
 
-(defn default-impl [pred sub {:keys [f arglist expr]}]
-  (let [f       (u/resolve-sym f)
-        _Gamma       (assoc @t/type-env pred ::temp)
-        code    (u/macroexpand-all (list 'fn arglist expr))
-        [e t]   (check code)
-        [as pt] (get _Gamma f)
-        _ (assert pt (format "Symbol %s not found in env" f))
-        [ps t'] pt
-        _ (assert t')
-        [s p]   (rel-unify _Gamma t (t/substitute t' sub))
-        [_ t]   (infer/release t)]
-    (t/substitute (base/$ e t) s)))
-
 (defn check-lambda [_Gamma bindings types e]
   (let [types' (map (fn [a] (Forall. (base/ftv a) a)) types)
         _Gamma (apply assoc _Gamma (interleave bindings types'))
@@ -196,38 +183,36 @@
         e2  (reduce #(Lambda. (Symbol. %2) %) e bindings)]
     [s (base/$ e2 (infer/with-pred _Gamma ps t2))]))
 
+(defn check-impl [pred sub f code]
+  (let [f        (u/resolve-sym f)
+        _Gamma        (assoc @t/type-env pred ::temp)
+        code     (u/macroexpand-all code)
+        _ (prn code)
+        [s1 syn] (infer/checks _Gamma code)
+        [e t]    (t/substitute syn s1)
+        [as pt]  (get _Gamma f)
+        _        (assert pt (format "Symbol %s not found in env" f))
+        [ps t']  pt
+        _        (assert t')
+        sigma    (t/substitute (infer/instantiate (Forall. as t')) sub)
+        [s p]    (rel-unify _Gamma t sigma)
+        _        (prn t' sub)
+        [_ t]    (infer/release t)]
+    (t/substitute (base/$ e t) s)))
+
+(defn default-impl [pred sub {:keys [f arglist expr]}]
+  (check-impl pred sub f (list 'fn arglist expr)))
+
 (defn match-impl [pred sub {:keys [f impls]}]
-  (let [n       (count (:arglist (first impls)))
-        vs      (defn/vars n)
-        f       (u/resolve-sym f)
-        _Gamma       (assoc @t/type-env pred ::temp)
-        ;; ts      (@t/type-env f)
-        ;; _ (prn 'ttttsssss ts)
-        ;; arg-ts  (arrseq (:t (t/substitute (:t ts) sub)))
-        ;; _ (prn 'arg-tssss arg-ts)
-        code    `(fn [~@vs]
+  (let [n    (count (:arglist (first impls)))
+        vs   (defn/vars n)
+        code `(fn [~@vs]
                    ~(case/case*
                      (case/tuple n vs)
                      (mapcat (fn [{:keys [arglist expr]}]
                                `[~(case/tuple n arglist) ~expr])
-                             impls)))
-        code     (u/macroexpand-all code)
-        ;; _ (prn 'code code)
-        ;; [s1 syn] (check-lambda _Gamma vs arg-ts code)
-        [s1 syn] (infer/checks _Gamma code)
-        [e t]    (t/substitute syn s1)
-        ;; _ (prn 'e e)
-        [as pt]  (get _Gamma f)
-        _ (assert pt (format "Symbol %s not found in env" f))
-        [ps t'] pt
-        _ (assert t')
-        ;; _ (prn t t')
-        ;; _ (prn sub)
-        sigma (t/substitute (infer/instantiate (Forall. as t')) sub)
-        [s p]   (rel-unify _Gamma t sigma)
-        _ (prn t' sub)
-        [_ t]   (infer/release t)]
-    (t/substitute (base/$ e t) s)))
+                             impls)))]
+    (check-impl pred sub f code)))
 
 (defn impl [pred sub impls]
   (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)

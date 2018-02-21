@@ -29,7 +29,13 @@
 
 (defn unification-failure [a b]
   (throw
-   (Exception. (format "Cannot unify %s and %s" (pr-str a) (pr-str b))
+   (Exception.
+    (format "Cannot unify %s and %s"
+            (pr-str a)
+            ;; (type a)
+            (pr-str b)
+            ;; (type b)
+            )
             ;;{:type :unification-failure :a a :b b}
                )))
 

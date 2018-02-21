@@ -86,6 +86,8 @@
                                (:tag sub)
                                (instance? Var sub)
                                sub
+                               (instance? Const sub)
+                               (:x sub)
                                :else
                                sub #_(throw
                                 (Exception.
