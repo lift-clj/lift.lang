@@ -28,6 +28,12 @@
 (def ftv base/ftv)
 (def substitute base/substitute)
 
+(defn find-type [_Gamma tag]
+  (some (fn [[k v]] (and (instance? Container k) (= tag (:tag k)) v)) _Gamma))
+
+(defn get-type [_Gamma tag]
+  (get _Gamma tag))
+
 (defn ex-unknown-type [t]
   (throw (ex-info (format "Unknown Type %s" (pr-str t))
                   {:type ::unknown-type :t t})))

@@ -18,11 +18,11 @@
 (base/import-syntax-types)
 (base/import-type-types)
 
-(defn prim? [x]
-  (and (simple-symbol? x) (contains? @t/type-env x)))
+;; (defn prim? [x]
+;;   (and (simple-symbol? x) (contains? @t/type-env x)))
 
 (defn class-name? [x]
-  (and (symbol? x) (not (prim? x)) (class? (resolve x))))
+  (and (symbol? x) (class? (resolve x))))
 
 (defn mark? [x]
   (instance? Mark x))
@@ -46,7 +46,7 @@
   (s/and seq? #(= 'def (first %)) (s/coll-of any?)))
 
 (s/def ::var
-  (s/and symbol? (complement prim?) (complement class-name?)))
+  (s/and symbol? (complement class-name?)))
 
 (s/def ::arglist (s/coll-of ::var :kind vector?))
 

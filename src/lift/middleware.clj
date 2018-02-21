@@ -110,6 +110,8 @@
       (c/eval expr)
       (let [code (u/macroexpand-all expr)
             [s [_ t err :as expr]] (check code)]
+        ;; (prn code)
+        ;; (prn err)
         (if (seq err)
           (throw (type-check-error (first err)))
           (let [ftvs (base/ftv t)

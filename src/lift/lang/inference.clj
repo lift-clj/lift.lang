@@ -46,6 +46,8 @@
 (defn instantiate [[as t :as x]]
   (let [vars  (mapv (comp #(Var. %) gensym symhead) as)
         subst (t/sub (zipmap as vars))]
+    ;; (prn 'here vars x)
+    ;; (prn t)
     (t/substitute t subst)))
 
 (defn generalize [env t]
@@ -74,12 +76,12 @@
   ([[Predicate tag as]]
    (Predicate. tag (mapv concrete-instance as)))
   ([[Container tag args]]
-   (Const. (symbol (name tag))))
-  ;; TODO: ^^ this should be ns qualified
+   (Const. (symbol (namespace tag) (name tag))))
   ([[Const _ :as c]] c)
   ([x] x))
 
 (defn release? [_Gamma p]
+  ;; (prn p)
   (let [p (if (concrete-instance? p)
             (concrete-instance p)
             p)]

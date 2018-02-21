@@ -35,28 +35,37 @@
        type/id
        (->> (map (fn [a a'] [(:a a') a]) a a')
             (into {})
-            (type/sub))))))
+            (type/sub)))
+     type/id))
+  ([_ _] type/id))
 
-;; (@type/type-env 'Eq)
+(type/get-type @type/type-env 'Eq)
 (p/defn -rewrite
   ([_Gamma sub [SyntaxNode
            [Symbol f]
            [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
    (if (infer/concrete-instance? p)
      (let [[_ as' :as inst] (infer/concrete-instance p)
-           [sub'] (some->> (map (comp _Gamma :x) as')
+           ;; _ (prn as')
+           ;; (throw as' are unresolved)
+           [sub'] (some->> (map #(:t (type/find-type _Gamma (:x %))) as')
                            (remove nil?)
                            (seq)
                            (map unify/unify as)
                            (reduce unify/compose))
+           ;; _ (prn 'sub' sub')
            sub' (if (seq sub') (type/sub (merge (:s sub) sub')) sub)
            code (-> (get _Gamma inst)
                     (get (u/resolve-sym f))
                     (type/substitute sub'))]
        (rewrite _Gamma sub' code))
-     (let [[m :as psub] (unify-predicate (_Gamma ptag) p)
+     (let [[m :as psub] (unify-predicate p (type/get-type _Gamma ptag))
+           ;; _ (prn 'lkup ptag (type ptag) (lookup-type _Gamma ptag))
            sub' (unify/compose sub psub)
+           ;; _ (prn 'psub p ptag psub)
+           ;; _ (prn 'sub' sub')
            syn' (type/substitute syn sub')]
+       ;; (prn 'syn' syn')
        (if (not= syn syn')
          (rewrite _Gamma sub' syn')
          (Curry. (resolve f))))))

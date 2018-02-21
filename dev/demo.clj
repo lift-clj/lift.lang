@@ -8,10 +8,15 @@
             [lift.lang.inference :as infer]))
 
 (= (Just (Just (Just 1))) (Just (Just (Just 1))))
+(= (Just 1) (Just 1))
 
-;; (= (Pair 1 2) (Pair 3 4))
+;; (Just 1)
+(= (Pair 1 2) (Pair 1 2))
 
-(_? (Just 1) (Just 1))
+;; (Pair 1 2)
+
+;; (Just 1)
+;; (_? (Just 1) (Just 1))
 
 ;; '(1 2 3)
 

@@ -184,3 +184,7 @@
    `(intern-type-only (type-signature '~type)))
   ([type sig]
    `(intern-type-sig '~(u/resolve-sym type) (type-signature '~sig))))
+
+;; (map (comp prn key) @type-env)
+
+;; (@type-env 'Pair)

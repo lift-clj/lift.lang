@@ -79,7 +79,13 @@
 
 (impl (Eq Pair)
   (=
-    ([(Pair a b) (Pair c d)] (if (= a b) (= c d) False))))
+    ([(Pair a b) (Pair c d)]
+     (if (= a c) (= b d) False))))
+
+;; (impl (Eq Pair)
+;;   (= [x y]
+;;     (case [x y]
+;;       [(Pair a b) (Pair c d)] (if (= a c) (= b d) False))))
 
 ;; TODO: Eq Maybe is correct, Eq (Maybe a) is odd
 

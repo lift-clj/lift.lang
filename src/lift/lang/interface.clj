@@ -9,7 +9,8 @@
    [lift.lang.unification :as unify]
    [lift.lang.util :as u]
    [lift.lang.analyze :as ana]
-   [lift.lang.rewrite :as rewrite]))
+   [lift.lang.rewrite :as rewrite]
+   [lift.lang.inference :as infer]))
 
 (base/import-syntax-types)
 (base/import-type-types)
@@ -83,10 +84,24 @@
        (swap! t/type-env assoc '~class ~pred)
        '~t)))
 
+(def clojure-imports
+  '#{Keyword Ratio Symbol})
+
+(defn resolve-type-param [a]
+  (let [r (resolve a)]
+    (cond (contains? clojure-imports a)
+          a
+          (class? r)
+          (symbol (.getSimpleName r))
+          :else
+          (u/resolve-sym a))))
+
 (defn impl [[tag & as] impls]
-  (let [consts (mapv #(Const. %) as)
-        tag-ts (map #(or (@t/type-env %) (Const. %)) as)
-        ;; _ (prn 'tag-ts tag-ts)
+  (let [as     (map resolve-type-param as)
+        consts (mapv #(Const. %) as)
+        tag-ts (map #(or (some-> (t/find-type @t/type-env %) infer/instantiate)
+                         (Const. %)) as)
+        _ (prn 'tag-ts tag-ts)
         [_ bs] (get @t/type-env tag)
         pred   (Predicate. tag consts)
         sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]

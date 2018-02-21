@@ -13,7 +13,8 @@
    [lift.lang.type.impl :as impl]
    [lift.lang.unification :refer [unify]]
    [lift.lang.util :as u]
-   [lift.lang.case :as case]))
+   [lift.lang.case :as case]
+   [lift.lang.type :as type]))
 
 (base/import-syntax-types)
 (base/import-type-types)
@@ -201,20 +202,28 @@
         f       (u/resolve-sym f)
         _Gamma       (assoc @t/type-env pred ::temp)
         ts      (@t/type-env f)
+        _ (prn 'ttttsssss ts)
         arg-ts  (arrseq (:t (t/substitute (:t ts) sub)))
-        code    (case/case*
-                 (case/tuple n vs)
-                 (mapcat (fn [{:keys [arglist expr]}]
-                           `[~(case/tuple n arglist) ~expr])
-                         impls))
+        ;; _ (prn 'arg-tssss arg-ts)
+        code    `(fn [~@vs]
+                   ~(case/case*
+                     (case/tuple n vs)
+                     (mapcat (fn [{:keys [arglist expr]}]
+                               `[~(case/tuple n arglist) ~expr])
+                             impls)))
         code     (u/macroexpand-all code)
-        [s1 syn] (check-lambda _Gamma vs arg-ts code)
+        _ (prn code)
+        ;; [s1 syn] (check-lambda _Gamma vs arg-ts code)
+        [s1 syn] (infer/checks _Gamma code)
         [e t]    (t/substitute syn s1)
+        _ (prn e)
         [as pt]  (get _Gamma f)
         _ (assert pt (format "Symbol %s not found in env" f))
         [ps t'] pt
         _ (assert t')
+        _ (prn t t')
         [s p]   (rel-unify _Gamma t (t/substitute t' sub))
+        _ (prn t' sub)
         [_ t]   (infer/release t)]
     (t/substitute (base/$ e t) s)))
 
@@ -226,3 +235,5 @@
                 :default (partial default-impl pred sub)
                 :match   (partial match-impl pred sub))]
     (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
+
+;; (@t/type-env 'Pair)

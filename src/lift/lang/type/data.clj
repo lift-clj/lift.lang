@@ -14,8 +14,7 @@
 (base/import-types)
 
 (defn container-intern-impl [tag args sig]
-  `(def/intern-type-sig
-     '~(u/resolve-sym tag)
+  `(def/intern-type-sig '~(u/resolve-sym tag)
      ~(u/curry #(Arrow. % %2) (into args [sig]))))
 
 (defn private-classname [tag]
@@ -77,7 +76,7 @@
         type-expr (apply list tag args)
         sig (def/type-signature type-expr)]
     `(do
-       (swap! t/type-env assoc '~tag ~sig)
+       ;; (swap! t/type-env assoc '~tag ~sig)
        (def/intern-type-only ~sig)
        ~@(mapcat
           (fn [part]
