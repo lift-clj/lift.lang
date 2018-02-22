@@ -75,11 +75,6 @@
 (defn rewrite [_Gamma sub x]
   (impl/cata (fn rewrite [x] (-rewrite _Gamma sub x)) x))
 
-(defn ctor [s]
-  (let [n (name s)]
-    (when (.endsWith n ".")
-      `#(new ~(resolve (symbol (subs n 0 (dec (count n))))) %))))
-
 (p/defn -emit
   ([[Literal a]] a)
   ([[Symbol a]] a)
