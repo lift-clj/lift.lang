@@ -1,4 +1,5 @@
 (ns lift.lang.type.def
+  (:refer-clojure :exclude [ns-name])
   (:require
    [clojure.spec.alpha :as s]
    [lift.lang.type.base :as base]
@@ -8,6 +9,35 @@
 (base/import-type-types)
 
 (def type-env (atom {}))
+
+(defn find-type [_Gamma tag]
+  (some (fn [[k v]] (and (instance? Container k) (= tag (:tag k)) v)) _Gamma))
+
+(defn get-type [_Gamma tag]
+  (get _Gamma tag))
+
+(defn ns-name [ns]
+  (cond (symbol? ns) (name ns)
+        (instance? clojure.lang.Namespace ns) (.name ns)
+        :else (throw (Exception. (str "Cannot get name of non-ns " (pr-str ns))))))
+
+(defn try-ns-resolve [ns s]
+  (try (ns-resolve ns s) (catch Throwable _)))
+
+(defn resolve-sym
+  ([ns s]
+   (if (namespace s)
+     (some->> s (try-ns-resolve ns) u/->sym)
+     (or (some->> s (try-ns-resolve ns) u/->sym)
+         (get-type @type-env (symbol (name (ns-name ns)) (name s)))
+         (find-type @type-env (symbol (name (ns-name ns)) (name s)))
+         (some->> s (try-ns-resolve 'lift.lang) u/->sym)
+         (let [s' (symbol "lift.lang" (name s))]
+           (or (when (get-type @type-env s') s')
+               (when (find-type @type-env s') s')))
+         (u/ns-qualify s))))
+  ([s]
+   (resolve-sym *ns* s)))
 
 (s/def ::unit #{()})
 
@@ -92,15 +122,8 @@
 (defmethod construct :unit  [[_ _]] (Unit.))
 
 (defmethod construct :type-name [[_ ast]]
-  ;; let [env @type-env]
-  ;; or (get env ast) ;; TODO: I don't understand this bit
-  (let [sym (u/resolve-sym ast)
-        t (Const. sym)]
-    #_(or (when (contains? env sym) t)
-          (when (contains? env t) t))
-    t)
-  ;; (ex-unknown-type ast)
-  )
+  (let [sym (resolve-sym ast)]
+    (Const. sym)))
 
 (defmethod construct :type-const [[_ ast]] (Const. ast))
 
@@ -136,10 +159,10 @@
       (assoc :rec-cons (construct [:rec-cons (:rec-cons ast)]))))
 
 (defmethod construct :simple-type [[_ type-name]]
-  (Container. (u/resolve-sym type-name) nil))
+  (Container. (resolve-sym type-name) nil))
 
 (defmethod construct :parameterized [[_ [_ x]]]
-  (let [tag (u/resolve-sym (:type-name x))]
+  (let [tag (resolve-sym (:type-name x))]
     (let [args (mapv construct (:args x))]
       (Container. tag args))))
 
@@ -183,7 +206,7 @@
   ([type]
    `(intern-type-only (type-signature '~type)))
   ([type sig]
-   `(intern-type-sig '~(u/resolve-sym type) (type-signature '~sig))))
+   `(intern-type-sig '~(resolve-sym type) (type-signature '~sig))))
 
 ;; (map (comp prn key) @type-env)
 

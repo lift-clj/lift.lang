@@ -36,6 +36,11 @@
   [& decl]
   (data/data* decl))
 
+(defmacro with-ctor
+  {:style/indent :defn}
+  [data-decl type-sig ctor-fn]
+  (data/private-data* type-sig ctor-fn (rest data-decl)))
+
 (defmacro interface
   {:style/indent :defn}
   [type & decl]
@@ -168,20 +173,23 @@
     ([(Just x) f] (f x))
     ([Nothing  _] Nothing)))
 
+;; (with-ctor
+;;   (data Email = Email String)
+;;   (String -> Maybe Email)
+;;   (fn [s]
+;;     (if (.contains s "@") (Just (Email s)) Nothing)))
+
 ;; (data State s a = State h)
 
 ;; (impl (Monad State)
 ;;   (return
-;;     ([a] (State (fn [s] (Pair a s)))))
+;;     ([a] (State (fn [s] (case/Tuple2 a s)))))
 ;;   (>>=
 ;;     ([(State h) f]
 ;;      (State (fn [s]
-;;               (let [])
-;;               )))
-;;     )
-;;   )
+;;               (let [[a s']    (h s)
+;;                     (State g) (f a)]
+;;                 (g s')))))))
 
 ;; TODO: State monad needs:
-;; typed let destructuring
 ;; record function type constructor syntax
-;; vector as tuple syntax

@@ -66,7 +66,7 @@
   Ftv     (-ftv  [_]   (difference t preds))
   Show    (-show [_]   (str (string/join ", " preds) " => " t)))
 
-(impl/deftype (New t))
+(impl/deftype (New value))
 
 (impl/deftype (Container tag args)
   Ftv  (-ftv [_] (union (if (instance? Var tag) #{(:a tag)} #{})

@@ -34,6 +34,17 @@
 (defn get-type [_Gamma tag]
   (get _Gamma tag))
 
+(defn resolve-sym
+  ([ns s]
+   (if (namespace s)
+     s
+     (or (some->> s (ns-resolve ns) u/->sym)
+         (get-type @type-env (symbol (name (ns-name ns)) (name s)))
+         (find-type @type-env (symbol (name (ns-name ns)) (name s)))
+         (u/ns-qualify s))))
+  ([s]
+   (resolve-sym *ns* s)))
+
 (defmacro t [x]
   `(get @type-env '~(u/resolve-sym x)))
 

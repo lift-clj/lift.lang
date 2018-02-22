@@ -86,7 +86,41 @@
           (or (:sum-cons parsed) [(:value-cons parsed)]))
        ~sig)))
 
+(defn private-ctor-impl [tag classname dtor-sig arglist args ctor-fn]
+  `(defn ~(with-meta tag (container-prj-impl tag classname dtor-sig arglist args))
+     ~arglist
+     (letfn [(~tag [x#] (new ~classname x#))]
+       (~ctor-fn ~@arglist))))
+
+(defn private-container-impl [part sig ctor-sig ctor-fn]
+  (let [tag (symbol (name (.-tag part)))
+        args (.-args part)
+        arglist (mapv container-arg args)
+        classname (private-classname tag)]
+    [`(def/intern-type-sig '~(u/resolve-sym tag) ~ctor-sig)
+     (container-deftype-impl tag classname arglist)
+     (impl/prn-impl classname)
+     (private-ctor-impl tag classname sig arglist args ctor-fn)]))
+
+(defn private-data* [ctor-sig ctor-fn decl]
+  (let [{:keys [type-cons value-cons] :as parsed} (def/parse-data-decl decl)
+        args (mapv :a (.-args type-cons))
+        tag (symbol (name (.-tag type-cons)))
+        type-expr (apply list tag args)
+        sig (def/type-signature type-expr)
+        ctor-sig (def/type-signature ctor-sig)]
+    ;; TODO: *must* check only one type param, and not a value/sumtype
+    `(do
+       (def/intern-type-only ~sig)
+       ~@(private-container-impl value-cons sig ctor-sig ctor-fn)
+       ~sig)))
+
 (defmacro data
   {:style/indent :defn}
   [& decl]
   (data* decl))
+
+(defmacro with-ctor
+  {:style/indent :defn}
+  [data-decl type-sig ctor-fn]
+  (private-data* type-sig ctor-fn (rest data-decl)))

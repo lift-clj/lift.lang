@@ -3,12 +3,44 @@
 
 (ns demo
   {:lang :lift/clojure}
-  (:refer-clojure :exclude [+ * - / = case defn map name read not=])
-  (:require [lift.lang :refer :all]))
+  (:refer-clojure :exclude [+ * - / = case defn let map name read not=])
+  (:require
+   [lift.lang :refer :all]
+   [lift.lang.monad :as m]))
 
 ;; automatic currying
 ;; (map (+ 2) [1 2 3])
 
+;; (m/do [a (Just 1)]
+;;   (return (pos? a)))
+
+;; (let [x (Pair 1 2)]
+;;   (let [(Just a) x]
+;;     a))
+
+(with-ctor
+  (data Email = Email String)
+  (String -> Maybe Email)
+  (fn [s]
+    (if (.contains s "@") (Just (Email s)) Nothing)))
+
+(impl (Coercible Email String)
+  (coerce
+    ([(Email s)] s)))
+
+;; (Email "not-a-real-email")
+
+;; (Email "me@andrewmcveigh.com")
+
+;; (case (Email "andrew@test")
+;;   (Just e) (coerce e)
+;;   Nothing  "s"
+;;   ;; Nothing  "oops"
+;;   )
+
+;; (case (Just (Just 1))
+;;   (Just (Just x)) x
+;;   )
 ;; (>>= (Just 1) (fn [a] (Just (inc a))))
 
 ;; (map inc (Just 1))
@@ -185,21 +217,21 @@
 
 ;; ;; ;; Different logical interpreter
 
-(def list-of-maybes
-  (->> () (cons (Right 1)) (cons (Left {:something 2}))))
+;; (def list-of-maybes
+;;   (->> () (cons (Right 1)) (cons (Left {:something 2}))))
 
 
-;; Hole DD / type search
-(map (_? true) list-of-maybes)
+;; ;; Hole DD / type search
+;; (map (_? true) list-of-maybes)
 
-(def list-of-maybes-2
-  (->> ()
-       (cons (Right "Err"))
-       (cons (Left {:something "coffee"}))
-       (cons (Right "Err2"))
-       (cons (Left {:something "this"}))))
+;; (def list-of-maybes-2
+;;   (->> ()
+;;        (cons (Right "Err"))
+;;        (cons (Left {:something "coffee"}))
+;;        (cons (Right "Err2"))
+;;        (cons (Left {:something "this"}))))
 
-(map (_? true) list-of-maybes-2)
+;; (map (_? true) list-of-maybes-2)
 ;; TODO: refine this enough for only one function
 
 ;; ;; ;; Seen what Idris can do?
