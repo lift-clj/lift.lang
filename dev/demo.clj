@@ -189,13 +189,13 @@
 ;; (let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
 ;;   (:something-else (add-final-total x)))
 
-;; Testing out different syntax elements, inspect types
-(case (let [a (Left {:something "Hi!"})
-            b (Right "test")
-            c false]
-        ((fn [y] (let [x y] (if c x b))) a))
-  (Left  a) (:something a)
-  (Right b) b)
+;; ;; Testing out different syntax elements, inspect types
+;; (case (let [a (Left {:something "Hi!"})
+;;             b (Right "test")
+;;             c false]
+;;         ((fn [y] (let [x y] (if c x b))) a))
+;;   (Left  a) (:something a)
+;;   (Right b) b)
 
 
 ;; (defn deep-map-returning-fn [id]
@@ -204,10 +204,9 @@
 ;;       (assoc :e {:f {:g 30}})
 ;;       (assoc :h {:i "wut"})))
 
-;; ;; ;; ;; Tells you things about your data (\space t e)
+;; Tells you things about your data (\space t e)
 
 ;; (deep-map-returning-fn 1142)
-
 
 ;; (:a (deep-map-returning-fn 1142))
 
@@ -247,14 +246,15 @@
 
 ;; ;; ;; Seen what Idris can do?
 
-;; ;; (defmacro macro-test [expr]
-;; ;;   (let [[s ast] (check/infer @type/type-env (parse/parse expr))]
-;; ;;     (cond (check/unifies? ast (List a))
-;; ;;           `(map inc ~expr)
-;; ;;           (check/unifies? ast Int)
-;; ;;           `(+ ~expr 666)
-;; ;;           (check/unifies? ast Boolean)
-;; ;;           :hey!)))
+;; TODO: compelling macro?
+;; (defmacro macro-test [expr]
+;;   (let [[s ast] (check/infer @type/type-env (parse/parse expr))]
+;;     (cond (check/unifies? ast (List a))
+;;           `(map inc ~expr)
+;;           (check/unifies? ast Int)
+;;           `(+ ~expr 666)
+;;           (check/unifies? ast Boolean)
+;;           :hey!)))
 
 
 ;; ;; (macro-test (map identity (cons 1 (cons 1 (list)))))

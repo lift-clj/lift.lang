@@ -124,8 +124,6 @@
                 (c/eval (list 'def name ret))
                 (let [v (u/resolve-sym name)
                       sigma (Forall. (base/ftv t') t')]
-                  (prn (meta top-level-expr))
-                  (prn v sigma)
                   (swap! type/type-env assoc v sigma)
                   (base/$ (resolve v) t')))
               (let [ret' (pr-str (c/eval ret))]
@@ -175,7 +173,6 @@
 (defn type-of-expr-at-point [{:keys [file ns]
                               {[_ _ t :as tp] :pos top  :code} :top
                               {[_ _ e :as ep] :pos expr :code} :expr}]
-  (prn file ns)
   (try
     (or (and (not (symbol? expr))
              (ana/literal? expr)
@@ -188,7 +185,6 @@
         (let [expr (unmark-symbols (rdr/top-level-sexp top (- e t)))
               code (u/macroexpand-all expr)
               [s [n t err :as expr]] (check code)]
-          (prn expr)
           (let [ftvs (base/ftv t)
                 sub  (sub-pretty-vars ftvs)
                 t'   (type/substitute t sub)
@@ -247,7 +243,6 @@
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
         [line col] expr-pos
         code' (read-code msg)]
-    (clojure.pprint/pprint code')
     (if (control? code')
       (handler
        (assoc msg
