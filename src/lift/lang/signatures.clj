@@ -193,7 +193,7 @@
         _        (assert pt (format "Symbol %s not found in env" f))
         [ps t']  pt
         _        (assert t')
-        sigma    (t/substitute (infer/instantiate (Forall. as t')) sub)
+        sigma    (infer/instantiate (Forall. as (t/substitute t' sub)))
         [s p]    (rel-unify _Gamma t sigma)
         [_ t]    (infer/release t)]
     (t/substitute (base/$ e t) s)))
