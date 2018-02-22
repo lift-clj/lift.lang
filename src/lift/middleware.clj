@@ -10,6 +10,7 @@
    [clojure.core.specs.alpha :as cs]
    [clojure.string :as string]
    [clojure.java.io :as io]
+   [clojure.walk :as walk]
    [lift.lang :as lift]
    [lift.lang.inference :as infer]
    [lift.lang.rewrite :as rewrite]
@@ -23,7 +24,7 @@
    [lift.tools.reader :as rdr]
    [lift.lang.unification :as unify])
   (:import
-   [lift.lang.type.base Forall Literal Mark SyntaxNode Var]
+   [lift.lang.type.base Forall Literal Mark Prim SyntaxNode Var]
    [lift.lang.type.impl Type]))
 
 (def ^:dynamic *type-check* false)
@@ -77,9 +78,6 @@
 
 (defn read-string [s]
   (with-patched-reader (r/read-string s)))
-
-(defn check [expr]
-  (infer/check (u/macroexpand-all expr)))
 
 (defn sub-pretty-vars
   ([[f & ftvs] [v & vars]]
@@ -159,6 +157,13 @@
 (defn control? [x]
   (and (map? x) (contains? x ::op)))
 
+(defn unmark-symbols [x]
+  (walk/postwalk (fn [x]
+                   (if (and (instance? Mark x) (-> x :a symbol?))
+                     (vary-meta (:a x) assoc :mark true)
+                     x))
+                 x))
+
 (defn type-of-expr-at-point [{:keys [file ns]
                               {[_ _ t :as tp] :pos top  :code} :top
                               {[_ _ e :as ep] :pos expr :code} :expr}]
@@ -171,7 +176,7 @@
 
         (type-of-type expr)
 
-        (let [expr (rdr/top-level-sexp top (- e t))
+        (let [expr (unmark-symbols (rdr/top-level-sexp top (- e t)))
               code (u/macroexpand-all expr)
               [s [n t err :as expr]] (check code)]
           (let [ftvs (base/ftv t)
@@ -180,7 +185,8 @@
                 sigma (Forall. (base/ftv t') t')]
             (find-mark expr))))
     (catch Throwable t
-      (throw t))))
+      (println t)
+      t)))
 
 (def impl-namespaces
   (->> '[lift.lang.case

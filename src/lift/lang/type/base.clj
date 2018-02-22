@@ -137,7 +137,8 @@
   Ftv     (-ftv  [_]   (set (apply concat xs)))
   Show    (-show [_]   (format "[%s]" (string/join " " xs))))
 
-(impl/deftype (Mark a))
+(impl/deftype (Mark a)
+  Functor (-map  [x _] x))
 
 (impl/deftype (Literal a)
   Functor (-map [x _] x)
@@ -159,8 +160,8 @@
   Functor (-map [_ f] (Apply. (f e1) (f e2))))
 
 (impl/deftype (Let x e1 e2)
-  Show    (-show [_] (format "(let [%s %s] %s)" x e1 e2))
-  Functor (-map [_ f] (Let. x (f e1) (f e2))))
+  Show    (-show [_]   (format "(let [%s %s] %s)" x e1 e2))
+  Functor (-map  [_ f] (Let. x (f e1) (f e2))))
 
 (impl/deftype (If cond then else)
   Show    (-show [_] (format "(if %s %s %s)" cond then else))
@@ -169,12 +170,12 @@
 (impl/deftype (Prim f t)
   Functor (-map   [x _] x)
   IFn     (invoke [_ x] ((eval f) x))
-  Show    (-show  [_  ] (name (second f))))
+  Show    (-show  [_]   (name (second f))))
 
 (impl/deftype (SyntaxNode n t e m)
   Functor (-map  [_ f] (SyntaxNode. (f n) t e m))
   Show    (-show [_]
-            (let [expr (cond (instance? Type n) n
+            (let [expr (cond (instance? Type n) (pr-str n)
                              (string? n) n
                              :else (pr-str n))]
               (str n

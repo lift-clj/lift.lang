@@ -232,6 +232,7 @@
 
                   (instance? Mark x)
                   (let [x'' (walk-exprs' (:a x))]
+                    (prn 'marked)
                     (if (instance? clojure.lang.IObj x'')
                       (vary-meta x'' assoc :mark true)
                       x''))

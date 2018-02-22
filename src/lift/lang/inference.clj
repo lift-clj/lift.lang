@@ -155,7 +155,8 @@
 
   ([_Gamma [Let [x] e1 e2]]
    (let [[s1 [_ t1 :as e1]] (e1 _Gamma)
-         _Gamma (-> _Gamma (t/substitute s1) (assoc x (generalize _Gamma t1)))
+         _Gamma (t/substitute _Gamma s1)
+         _Gamma (assoc _Gamma x (generalize _Gamma t1))
          [s2 [_ t2 :as e2]] (e2 _Gamma)]
       [(compose s2 s1) ($ (Let. x e1 e2) t2)]))
 

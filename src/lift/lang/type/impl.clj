@@ -119,8 +119,20 @@
 
 (defn prn-impl [classname]
   `(do
-     (defmethod print-method ~classname [~'x ~'w] (.write ~'w (show ~'x)))
-     (defmethod print-dup ~classname [~'x ~'w] (.write ~'w (show ~'x)))))
+     (defmethod print-method ~classname [x# w#]
+       (try
+         (.write w# (show x#))
+         (catch Throwable t#
+           (throw (Exception.
+                   (format "Tried to print %s but wouldn't .write" (str x#))
+                   t#)))))
+     (defmethod print-dup ~classname [x# w#]
+       (try
+         (.write w# (show x#))
+         (catch Throwable t#
+           (throw (Exception.
+                   (format "Tried to print %s but wouldn't .write" (str x#))
+                   t#)))))))
 
 (defn functor-impl [tag args]
   (let [f (gensym)]

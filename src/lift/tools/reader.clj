@@ -3,7 +3,8 @@
    [clojure.tools.reader :as r]
    [clojure.tools.reader.reader-types :as rt :refer [to-pbr]]
    [clojure.java.io :as io]
-   [clojure.string :as string])
+   [clojure.string :as string]
+   [lift.lang.type.base :as base])
   (:import
    [lift.lang.type.base Mark]))
 

@@ -211,7 +211,9 @@
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
     (cond (s/invalid? conformed)
-          (if (instance? Type expr)
+          (if (or (instance? lift.lang.type.impl.Type expr)
+                  (= "lift.lang.type.base.Prim" (.getName (class expr))))
+            ;; TODO: ^^ this is obviously totally broken. WTF?!
             expr
             (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
                             (s/explain-data ::expr expr))))

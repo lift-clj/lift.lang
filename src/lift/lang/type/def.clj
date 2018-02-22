@@ -29,8 +29,9 @@
    (if (namespace s)
      (some->> s (try-ns-resolve ns) u/->sym)
      (or (some->> s (try-ns-resolve ns) u/->sym)
-         (get-type @type-env (symbol (name (ns-name ns)) (name s)))
-         (find-type @type-env (symbol (name (ns-name ns)) (name s)))
+         (let [s' (symbol (name (ns-name ns)) (name s))]
+           (or (when (get-type @type-env s') s')
+               (when (find-type @type-env s') s')))
          (some->> s (try-ns-resolve 'lift.lang) u/->sym)
          (let [s' (symbol "lift.lang" (name s))]
            (or (when (get-type @type-env s') s')

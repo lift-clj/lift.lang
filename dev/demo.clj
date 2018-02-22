@@ -8,7 +8,10 @@
    [lift.lang :refer :all]
    [lift.lang.monad :as m]))
 
-;; automatic currying
+;; (case (let [a (Left {:something "Hi!"}) b (Right "test") c false] ((fn [y] (let [x y] (if c x b))) a)) (Left a) (:something a) (Right b) b)
+;; (case (let [a (Left {:something "Hi!"}) b (Right "test") c false] ((fn [y] (let [x y] (if c x b))) a)) (Left a) (:something a) (Right b) b)
+
+;; ;; automatic currying
 ;; (map (+ 2) [1 2 3])
 
 ;; (m/do [a (Just 1)]
@@ -18,15 +21,15 @@
 ;;   (let [(Just a) x]
 ;;     a))
 
-(with-ctor
-  (data Email = Email String)
-  (String -> Maybe Email)
-  (fn [s]
-    (if (.contains s "@") (Just (Email s)) Nothing)))
+;; (with-ctor
+;;   (data Email = Email String)
+;;   (String -> Maybe Email)
+;;   (fn [s]
+;;     (if (.contains s "@") (Just (Email s)) Nothing)))
 
-(impl (Coercible Email String)
-  (coerce
-    ([(Email s)] s)))
+;; (impl (Coercible Email String)
+;;   (coerce
+;;     ([(Email s)] s)))
 
 ;; (Email "not-a-real-email")
 
@@ -34,9 +37,7 @@
 
 ;; (case (Email "andrew@test")
 ;;   (Just e) (coerce e)
-;;   Nothing  "s"
-;;   ;; Nothing  "oops"
-;;   )
+;;   Nothing  "oops")
 
 ;; (case (Just (Just 1))
 ;;   (Just (Just x)) x
@@ -158,25 +159,35 @@
 ;;     (dissoc :b)
 ;;     :b)
 
+;; ;; Define VAT
 ;; (def VAT 0.20)
 
-;; ;; Weird calculation because I've not implemented polymorphic numbers
+;; ;; A function using VAT
 ;; (defn with-vat [x]
 ;;   (* (+ 1.0 VAT) x))
 
+;; ;; Another function using that function
 ;; (defn add-final-total [rental-pricing]
 ;;   (assoc rental-pricing
 ;;          :total (with-vat (:ex-vat-total rental-pricing))))
 
-;; ;; ;; What's the type of `add-final-total`?
+;; ;; What's the type of `add-final-total`?
+;; (add-final-total {:something 1})
 
-;; ;; (add-final-total {:something 1})
+;; I haven't written any types
 
-;; ;; ;; I haven't written any types
+;; ;; Doesn't make assumptions about what else is in the map
+;; ;; It just cares about the types needed to fulfil the function
+;; (let [x {:ex-vat-total 500.0}]
+;;   (add-final-total x))
 
+;; ;; But it keeps that stuff around in the type
 ;; (let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
 ;;   (add-final-total x))
 
+;; ;; So we could use it further down the chain
+;; (let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
+;;   (:something-else (add-final-total x)))
 
 ;; ;; Testing out different syntax elements, inspect types
 ;; (case (let [a (Left {:something "Hi!"})
