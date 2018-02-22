@@ -68,6 +68,7 @@
   ([_ _ [SyntaxNode [Apply e1 e2] [Arrow _]]]
    (Apply. (Curry. e1) e2))
   ([_ _ [SyntaxNode x _]] x)
+  ([_ _ [Let [SyntaxNode [Symbol a]] e1 e2]] (Let. a e1 e2))
   ([_ _ [Curry f]] f)
   ([_ _ x] x))
 

@@ -24,7 +24,7 @@
    [lift.tools.reader :as rdr]
    [lift.lang.unification :as unify])
   (:import
-   [lift.lang.type.base Forall Literal Mark Prim SyntaxNode Var]
+   [lift.lang.type.base Forall Let Literal Mark Prim SyntaxNode Var]
    [lift.lang.type.impl Type]))
 
 (def ^:dynamic *type-check* false)
@@ -151,7 +151,15 @@
     (if (p x)
       (f x)
       (do
-        (impl/cata (fn [x] (if (p x) (f x) x)) x)
+        (impl/cata (fn [x]
+                     (cond (p x)
+                           (f x)
+                           (and (instance? Let x)
+                                (instance? SyntaxNode (:x x))
+                                (-> x :x :m :mark true?))
+                           (f (-> x :x))
+                           :else
+                           x)) x)
         @a))))
 
 (defn control? [x]
@@ -167,6 +175,7 @@
 (defn type-of-expr-at-point [{:keys [file ns]
                               {[_ _ t :as tp] :pos top  :code} :top
                               {[_ _ e :as ep] :pos expr :code} :expr}]
+  (prn file ns)
   (try
     (or (and (not (symbol? expr))
              (ana/literal? expr)
@@ -179,6 +188,7 @@
         (let [expr (unmark-symbols (rdr/top-level-sexp top (- e t)))
               code (u/macroexpand-all expr)
               [s [n t err :as expr]] (check code)]
+          (prn expr)
           (let [ftvs (base/ftv t)
                 sub  (sub-pretty-vars ftvs)
                 t'   (type/substitute t sub)
@@ -231,17 +241,18 @@
                         (str (apply str (repeat (dec line) \newline))))
                       (java.io.StringReader.)
                       (rt/indexing-push-back-reader 1 file-name))]
-    (if (= op "eval") [(r/read rdr)] code)))
+    (if (= op "eval") (r/read rdr) code)))
 
 (defn eval-handler [handler {:keys [op ns file-name expr-pos code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
         [line col] expr-pos
-        code (read-code msg)]
-    (if (control? (first code))
+        code' (read-code msg)]
+    (clojure.pprint/pprint code')
+    (if (control? code')
       (handler
        (assoc msg
-              :eval `identity
-              :code [(run-op (-> code first (assoc :ns (symbol ns))))]))
+              :eval (symbol "lift.middleware" (name (::op code')))
+              :code [(assoc code' :ns (symbol ns))]))
       (let [eval (case op "eval" `lift "load-file" `lift)]
         (if lift?
           (-> (assoc msg :eval eval :code code)
