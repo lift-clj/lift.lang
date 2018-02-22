@@ -231,13 +231,14 @@
       (println t))))
 
 (defn read-code [{:keys [op ns file-name expr-pos code] :as msg}]
-  (let [[line] expr-pos
-        rdr   (some-> code
-                      (cond->> line
-                        (str (apply str (repeat (dec line) \newline))))
-                      (java.io.StringReader.)
-                      (rt/indexing-push-back-reader 1 file-name))]
-    (if (= op "eval") (r/read rdr) code)))
+  (when (seq code)
+    (let [[line] expr-pos
+          rdr   (some-> code
+                        (cond->> line
+                          (str (apply str (repeat (dec line) \newline))))
+                        (java.io.StringReader.)
+                        (rt/indexing-push-back-reader 1 file-name))]
+      (if (= op "eval") (r/read rdr) code))))
 
 (defn eval-handler [handler {:keys [op ns file-name expr-pos code] :as msg}]
   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
