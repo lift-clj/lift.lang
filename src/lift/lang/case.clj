@@ -21,6 +21,9 @@
   ([vars] (tuple (count vars) vars))
   ([n vars] `(~(nth tpl (dec n)) ~@vars)))
 
+(defn tuple-prjs [n]
+  (-> tpl (nth (dec n)) resolve meta :prj :fs))
+
 (s/def ::ctor (s/and symbol? #(re-matches #"^[A-Z].*$" (name %))))
 (s/def ::var  (s/and simple-symbol? #(re-matches #"^[^A-Z].*$" (name %))))
 (s/def ::tupl (s/coll-of any? :kind vector?))

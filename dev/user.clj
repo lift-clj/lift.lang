@@ -1,5 +1,5 @@
 (ns user
-  (:refer-clojure :exclude [+ * - / = case defn map name read not=])
+  (:refer-clojure :exclude [+ * - / = case defn let map name read not=])
   (:require
    ;; [clojure.core :as c]
    ;; [clojure.pprint :refer [pprint]]

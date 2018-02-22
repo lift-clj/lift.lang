@@ -29,7 +29,9 @@
 (def ^:dynamic *type-check* false)
 (def ^:dynamic *prn-type* false)
 
-(def ignore #{#'ns 'ns 'try #'type/def #'lift/data #'defmacro})
+(def ignore
+  #{#'ns 'ns 'try #'type/def #'lift/interface #'lift/impl #'lift/data
+    #'lift/with-ctor #'defmacro})
 
 (defn ignore? [[op]]
   (and (symbol? op)

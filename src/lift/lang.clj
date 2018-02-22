@@ -1,9 +1,11 @@
 (ns lift.lang
-  (:refer-clojure :exclude [+ * - / case defn map name read = not=])
+  (:refer-clojure :exclude [+ * - / case defn let map name read = not=])
   (:require
    [lift.lang.case :as case]
    [lift.lang.defn :as defn]
    [lift.lang.interface :as iface]
+   [lift.lang.let :as let]
+   [lift.lang.monad :as monad]
    [lift.lang.prim :as prim]
    [lift.lang.type :as type]
    [lift.lang.type.data :as data]))
@@ -49,6 +51,9 @@
 
 (defmacro defn [name & decl]
   (defn/defn* name decl))
+
+(defmacro let [bindings expr]
+  (let/destructuring-let bindings expr))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)
