@@ -9,33 +9,33 @@
    [lift.lang :refer :all]
    [lift.lang.type :as t]))
 
-;; A few type annotations for `clojure.core`
-(t/def (List a))
-(t/def (Vector a))
-(t/def instance? (Class -> a -> Boolean))
-(t/def identity  (a -> a))
-(t/def partial   ((a -> b -> c) -> a -> (b -> c)))
-(t/def inc       (Int -> Int))
-(t/def pos?      (Int -> Boolean))
-(t/def str       (a -> String))
-(t/def nth       (Vector a -> Int -> a))
-(t/def name      (Keyword -> String))
-(t/def =         (a -> a -> Boolean))
-(t/def +         (Int -> Int -> Int))
-(t/def *         (Int -> Int -> Int))
-(t/def /         (Int -> Int -> Ratio))
-(t/def double    (Ratio -> Double))
-(t/def list      (List a))
-(t/def cons      (a -> (List a) -> (List a)))
-(t/def first     ((List a) -> a))
-(t/def vector    (Vector a))
-(t/def conj      (Vector a -> a -> Vector a))
-(t/def get       ({l a | r} -> l -> a))
-(t/def assoc     ({| r} -> l -> a -> {l a | r}))
-(t/def dissoc    ({l a | r} -> l ->  {| r}))
-(t/def keyword   (String -> Keyword))
-(t/def reverse   (List a -> List a))
-(t/def map       ((a -> b) -> (List a) -> (List b)))
+;; ;; A few type annotations for `clojure.core`
+;; (t/def (List a))
+;; (t/def (Vector a))
+;; (t/def instance? (Class -> a -> Boolean))
+;; (t/def identity  (a -> a))
+;; (t/def partial   ((a -> b -> c) -> a -> (b -> c)))
+;; (t/def inc       (Int -> Int))
+;; (t/def pos?      (Int -> Boolean))
+;; (t/def str       (a -> String))
+;; (t/def nth       (Vector a -> Int -> a))
+;; (t/def name      (Keyword -> String))
+;; (t/def =         (a -> a -> Boolean))
+;; (t/def +         (Int -> Int -> Int))
+;; (t/def *         (Int -> Int -> Int))
+;; (t/def /         (Int -> Int -> Ratio))
+;; (t/def double    (Ratio -> Double))
+;; (t/def list      (List a))
+;; (t/def cons      (a -> (List a) -> (List a)))
+;; (t/def first     ((List a) -> a))
+;; (t/def vector    (Vector a))
+;; (t/def conj      (Vector a -> a -> Vector a))
+;; (t/def get       ({l a | r} -> l -> a))
+;; (t/def assoc     ({| r} -> l -> a -> {l a | r}))
+;; (t/def dissoc    ({l a | r} -> l ->  {| r}))
+;; (t/def keyword   (String -> Keyword))
+;; (t/def reverse   (List a -> List a))
+;; (t/def map       ((a -> b) -> (List a) -> (List b)))
 
 
 (t/def  inc-point (Long -> Long -> Vector Long))
@@ -44,17 +44,17 @@
 
 ;; toggle `*type-check*` `OFF`
 ;; Typically, you're writing a function... and running it in the REPL
-(defn ill-typed-function [x]
-  (inc-point x "string"))
+;; (defn ill-typed-function [x]
+;;   (inc-point x "string"))
 
-(ill-typed-function 1)
+;; (ill-typed-function 1)
 
-;; turn type-checking `ON`
+;; ;; turn type-checking `ON`
 
-;; Don't need to run it
+;; ;; Don't need to run it
 
-(defn ill-typed-function [x]
-  (inc-point x "string"))
+;; (defn ill-typed-function [x]
+;;   (inc-point x "string"))
 
 ;; Extensible records, with row types
 {:a 1 :b :c}
@@ -94,7 +94,7 @@
 
 ;; Type checker tells me I can't call this
 ;; What's the type of `add-final-total`?
-(add-final-total {:something 1})
+;; (add-final-total {:something 1})
 
 
 (let [x {:ex-vat-total 500.0}]
@@ -145,7 +145,7 @@
 
 ;; Hole DD / type search
 ;; what type of thing belongs here
-(map _? list-of-eithers)
+;; (map _? list-of-eithers)
 
 (defn some-other-function [condition either-val]
   (if condition
@@ -162,11 +162,11 @@
        (cons (Left {:something "this"}))))
 
 ;; If the types are refined enough, why not just fill it in
-(map (_? true) list-of-eithers-2)
+;; (map (_? true) list-of-eithers-2)
 
 
-;; Type safe containers, asserting an invariant is held when creating a type
-;; that way, you can't construct an invalid state
+;; Use a smart type constructor to assert an invariant is held when creating a
+;; type that way, you can't construct an invalid state
 (with-ctor
   (data Email = Email String)
   (String -> Maybe Email)
@@ -176,16 +176,8 @@
 (Email "not-a-real-email")
 (Email "me@andrewmcveigh.com")
 
-(def fake-email? (Email "not-a-real-email"))
-
-;; this gives me a Maybe emali, because the constructor will return Nothing
-;; if the email address is invalid
-(def my-email? (Email "me@andrewmcveigh.com"))
-
 ;; but, it can be a pain to have to unwrap these things all the time
 ;; so we can define a one-way coercion
-;; here we have a interface function coerce that will take any Coercible type a
-;; and turn it into a type b
 (interface (Coercible a b)
   (coerce (a -> b)))
 
@@ -211,7 +203,7 @@
   (return (a -> m a))
   (>>=    (m a -> (a -> m b) -> m b)))
 
-;; Here's the almost copy-paste from Haskell Maybe instance
+;; Here's the Maybe Monad instance
 (impl (Monad Maybe)
   (return ([a] (Just a)))
   (>>=
@@ -225,9 +217,9 @@
   (->> (reverse (partition 2 bindings))
        (reduce (fn [expr [sym mv]] `(demo/>>= ~mv (fn [~sym] ~expr))) expr)))
 
-;; can you see what's going on here?
-(mdo [email my-email?]
-  (return (person "Andrew" (coerce email))))
+;; ;; can you see what's going on here?
+;; (mdo [email (Email "me@andrewmcveigh.com")]
+;;   (return (person "Andrew" (coerce email))))
 
 ;; the monadic do notation is looking under the Maybe of `my-email?`, binding
 ;; the actual `Email` to `email`.
