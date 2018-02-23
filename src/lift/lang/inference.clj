@@ -130,7 +130,7 @@
              (Var. (gensym 'a)))]
     [s2 ($ (ctor coll') (Container. tag [t2]))]))
 
-(defn let-x [x t]
+(defn syn-sym [x t]
   ($ (Symbol. x) t [] (assoc (meta x) :expr x)))
 
 (p/defn -infer
@@ -145,7 +145,8 @@
          [s [_ t :as e]] (e _Gamma)
          [p1 t1] (release t)
          [p2 t2] (release (t/substitute tv s))]
-     [s ($ (Lambda. (Symbol. a) e) (with-pred _Gamma [p1 p2] (Arrow. t2 t1)))]))
+     [s ($ (Lambda. (syn-sym a t2) e)
+           (with-pred _Gamma [p1 p2] (Arrow. t2 t1)))]))
 
   ([_Gamma [Key k]] [id ($ (Key. k) (Const. k))])
 
@@ -162,7 +163,7 @@
          _Gamma (t/substitute _Gamma s1)
          _Gamma (assoc _Gamma x (generalize _Gamma t1))
          [s2 [_ t2 :as e2]] (e2 _Gamma)]
-      [(compose s2 s1) ($ (Let. (let-x x t1) e1 e2) t2)]))
+      [(compose s2 s1) ($ (Let. (syn-sym x t1) e1 e2) t2)]))
 
   ([_Gamma [If cond then else]]
     (let [[s1 [_ t1 :as cond]] (cond _Gamma)

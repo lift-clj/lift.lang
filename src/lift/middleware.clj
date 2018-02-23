@@ -24,7 +24,7 @@
    [lift.tools.reader :as rdr]
    [lift.lang.unification :as unify])
   (:import
-   [lift.lang.type.base Forall Let Literal Mark Prim SyntaxNode Var]
+   [lift.lang.type.base Forall Lambda Let Literal Mark Prim SyntaxNode Var]
    [lift.lang.type.impl Type]))
 
 (def ^:dynamic *type-check* true)
@@ -125,15 +125,12 @@
                 (c/eval top-level-expr)
                 (let [v     (u/resolve-sym name)
                       sig   (type/get-type @type/type-env v)
-                      _ (prn v (type v) sig)
                       sigma (Forall. (base/ftv t') t')
-                      _ (prn v sigma)
                       sig   (if sig
                               (do (unify/unify (infer/instantiate sig)
                                                (infer/instantiate sigma))
                                   sig)
                               sigma)]
-                  (prn sig)
                   (swap! type/type-env assoc v sig)
                   (base/$ (resolve v) sig)))
               (let [ret' (pr-str (c/eval ret))]
@@ -162,7 +159,7 @@
         (impl/cata (fn [x]
                      (cond (p x)
                            (f x)
-                           (and (instance? Let x)
+                           (and (or (instance? Lambda x) (instance? Let x))
                                 (instance? SyntaxNode (:x x))
                                 (-> x :x :m :mark true?))
                            (f (-> x :x))
@@ -199,7 +196,9 @@
                 sub  (sub-pretty-vars ftvs)
                 t'   (type/substitute t sub)
                 sigma (Forall. (base/ftv t') t')]
-            (find-mark expr))))
+            (-> (find-mark expr)
+                (type/substitute s)
+                (type/substitute sub)))))
     (catch Throwable t
       (println t)
       t)))

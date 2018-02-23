@@ -43,7 +43,6 @@
   ([_Gamma sub [SyntaxNode
            [Symbol f]
            [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
-   (prn 'here f)
    (if (infer/concrete-instance? p)
      (let [[_ as' :as inst] (infer/concrete-instance p)
            [sub'] (some->> (map (fn [a a']
@@ -69,6 +68,7 @@
   ([_ _ [SyntaxNode [Apply e1 e2] [Arrow _]]]
    (Apply. (Curry. e1) e2))
   ([_ _ [SyntaxNode x _]] x)
+  ([_ _ [Lambda [SyntaxNode x] e]] (Lambda. x e))
   ([_ _ [Let [SyntaxNode [Symbol a]] e1 e2]] (Let. a e1 e2))
   ([_ _ [Curry f]] f)
   ([_ _ x] x))

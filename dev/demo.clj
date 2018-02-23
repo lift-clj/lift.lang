@@ -48,7 +48,7 @@
 (defn ill-typed-function [x]
   (inc-point x "string"))
 
-(ill-typed-function 1)
+;; (ill-typed-function 1)
 
 ;; turn type-checking `ON`
 
