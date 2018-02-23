@@ -25,13 +25,13 @@
 (type/def first     ((List a) -> a))
 (type/def vector    (Vector a))
 (type/def conj      (Vector a -> a -> Vector a))
-(type/def map.      {})
+;; (type/def map.      {})
 (type/def get       ({l a | r} -> l -> a))
 (type/def assoc     ({| r} -> l -> a -> {l a | r}))
 (type/def dissoc    ({l a | r} -> l ->  {| r}))
 (type/def keyword   (String -> Keyword))
 (type/def reverse   (List a -> List a))
-(type/def map       ((a -> b) -> (List a) -> (List b)))
+;; (type/def map       ((a -> b) -> (List a) -> (List b)))
 
 (defmacro data
   {:style/indent :defn}
