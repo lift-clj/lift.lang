@@ -7,7 +7,6 @@
   (:require
    [clojure.core :as c]
    [lift.lang :refer :all]
-   [lift.lang.monad :as m]
    [lift.lang.type :as t]))
 
 ;; (t/def (List a))
@@ -43,10 +42,10 @@
 (defn inc-point [x y]
   [(inc x) (inc y)])
 
-;; toggle `*type-check*` `OFF`
-;; Typically, you're writing a function... and running it in the REPL
-(defn ill-typed-function [x]
-  (inc-point x "string"))
+;; ;; toggle `*type-check*` `OFF`
+;; ;; Typically, you're writing a function... and running it in the REPL
+;; (defn ill-typed-function [x]
+;;   (inc-point x "string"))
 
 ;; (ill-typed-function 1)
 
@@ -54,8 +53,8 @@
 
 ;; Don't need to run it
 
-(defn ill-typed-function [x]
-  (inc-point x "string"))
+;; (defn ill-typed-function [x]
+;;   (inc-point x "string"))
 
 ;; Extensible records, with row types
 {:a 1 :b :c}
@@ -95,7 +94,7 @@
 
 ;; Type checker tells me I can't call this
 ;; What's the type of `add-final-total`?
-(add-final-total {:something 1})
+;; (add-final-total {:something 1})
 
 ;; I haven't written any types
 
@@ -162,7 +161,7 @@
        (cons (Left {:something "this"}))))
 
 ;; If the types are refined enough, why not just fill it in
-(map (_? true) list-of-eithers-2)
+;; (map (_? true) list-of-eithers-2)
 
 ;; ;; ;; Seen what Idris can do?
 

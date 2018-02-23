@@ -30,9 +30,7 @@
 (def ^:dynamic *type-check* true)
 (def ^:dynamic *prn-type* false)
 
-(def ignore
-  #{#'ns 'ns 'try #'type/def #'lift/interface #'lift/impl #'lift/data
-    #'lift/with-ctor #'defmacro})
+(declare ignore)
 
 (defn ignore? [[op]]
   (and (symbol? op)
@@ -138,6 +136,25 @@
     (catch Throwable t
       (throw t))))
 
+(defn lifted-load [file file-path file-name]
+  (with-open [r (-> file
+                    (java.io.StringReader.)
+                    (rt/indexing-push-back-reader 1 file-name))]
+    (loop []
+      (when-let [expr (r/read r false nil)]
+        (lift expr)
+        (recur)))))
+
+(defn load-file-code [file file-path file-name]
+  (apply format
+    "(lift.middleware/lifted-load %s %s %s)"
+    (map (fn [item]
+           (binding [*print-length* nil
+                     *print-level* nil]
+             (pr-str item)))
+         [file file-path file-name])))
+
+
 (defn type-of-symbol [ns expr]
   (when-let [t (and (symbol? expr)
                     (get @type/type-env (u/resolve-sym ns expr)))]
@@ -232,6 +249,10 @@
       (throw t?)
       (first t?))))
 
+(def ignore
+  #{#'ns 'ns 'try #'type/def #'lift/interface #'lift/impl #'lift/data
+    #'lift/with-ctor #'defmacro #'lifted-load})
+
 (defn run-op [msg]
   (try
     ((ns-resolve 'lift.middleware (::op msg)) msg)
@@ -258,11 +279,12 @@
        (assoc msg
               :eval (symbol "lift.middleware" (name (::op code')))
               :code [(assoc code' :ns (symbol ns))]))
-      (let [eval (case op "eval" `lift "load-file" `lift)]
+      (let [eval (case op "eval" `lift "load-file" `c/eval)]
         (if lift?
-          (-> (assoc msg :eval eval :code [code'])
-              (cond-> (= op "load-file") (dissoc :ns))
-              (handler))
+          (binding [clojure.tools.nrepl.middleware.load-file/load-file-code load-file-code]
+              (-> (assoc msg :eval eval :code [code'])
+               (cond-> (= op "load-file") (dissoc :ns))
+               (handler)))
           (handler msg))))))
 
 (defn repl-fn [handler {:keys [op code ns file column line] :as msg}]
