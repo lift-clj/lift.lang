@@ -1,60 +1,60 @@
-;; `:type-check` metadata on namespace
-;; means namespace will be type-checked when turned on
 
 (ns demo
   {:lang :lift/clojure}
+  ;; ^^ `metadata` on namespace
+  ;; means namespace will be type-checked when turned on
   (:refer-clojure :exclude [+ * - / = case defn let map name read not=])
   (:require
    [clojure.core :as c]
    [lift.lang :refer :all]
    [lift.lang.type :as t]))
 
-;; (t/def (List a))
-;; (t/def (Vector a))
-;; (t/def instance? (Class -> a -> Boolean))
-;; (t/def identity  (a -> a))
-;; (t/def partial   ((a -> b -> c) -> a -> (b -> c)))
-;; (t/def inc       (Int -> Int))
-;; (t/def pos?      (Int -> Boolean))
-;; (t/def str       (a -> String))
-;; (t/def nth       (Vector a -> Int -> a))
-;; (t/def name      (Keyword -> String))
-;; (t/def =         (a -> a -> Boolean))
-;; (t/def +         (Int -> Int -> Int))
-;; (t/def *         (Int -> Int -> Int))
-;; (t/def /         (Int -> Int -> Ratio))
-;; (t/def double    (Ratio -> Double))
-;; (t/def list      (List a))
-;; (t/def cons      (a -> (List a) -> (List a)))
-;; (t/def first     ((List a) -> a))
-;; (t/def vector    (Vector a))
-;; (t/def conj      (Vector a -> a -> Vector a))
-;; (t/def map.      {})
-;; (t/def get       ({l a | r} -> l -> a))
-;; (t/def assoc     ({| r} -> l -> a -> {l a | r}))
-;; (t/def dissoc    ({l a | r} -> l ->  {| r}))
-;; (t/def keyword   (String -> Keyword))
-;; (t/def reverse   (List a -> List a))
-;; (t/def map       ((a -> b) -> (List a) -> (List b)))
+;; A few type annotations for `clojure.core`
+(t/def (List a))
+(t/def (Vector a))
+(t/def instance? (Class -> a -> Boolean))
+(t/def identity  (a -> a))
+(t/def partial   ((a -> b -> c) -> a -> (b -> c)))
+(t/def inc       (Int -> Int))
+(t/def pos?      (Int -> Boolean))
+(t/def str       (a -> String))
+(t/def nth       (Vector a -> Int -> a))
+(t/def name      (Keyword -> String))
+(t/def =         (a -> a -> Boolean))
+(t/def +         (Int -> Int -> Int))
+(t/def *         (Int -> Int -> Int))
+(t/def /         (Int -> Int -> Ratio))
+(t/def double    (Ratio -> Double))
+(t/def list      (List a))
+(t/def cons      (a -> (List a) -> (List a)))
+(t/def first     ((List a) -> a))
+(t/def vector    (Vector a))
+(t/def conj      (Vector a -> a -> Vector a))
+(t/def get       ({l a | r} -> l -> a))
+(t/def assoc     ({| r} -> l -> a -> {l a | r}))
+(t/def dissoc    ({l a | r} -> l ->  {| r}))
+(t/def keyword   (String -> Keyword))
+(t/def reverse   (List a -> List a))
+(t/def map       ((a -> b) -> (List a) -> (List b)))
 
 
 (t/def  inc-point (Long -> Long -> Vector Long))
 (defn inc-point [x y]
   [(inc x) (inc y)])
 
-;; ;; toggle `*type-check*` `OFF`
-;; ;; Typically, you're writing a function... and running it in the REPL
-;; (defn ill-typed-function [x]
-;;   (inc-point x "string"))
+;; toggle `*type-check*` `OFF`
+;; Typically, you're writing a function... and running it in the REPL
+(defn ill-typed-function [x]
+  (inc-point x "string"))
 
-;; (ill-typed-function 1)
+(ill-typed-function 1)
 
 ;; turn type-checking `ON`
 
 ;; Don't need to run it
 
-;; (defn ill-typed-function [x]
-;;   (inc-point x "string"))
+(defn ill-typed-function [x]
+  (inc-point x "string"))
 
 ;; Extensible records, with row types
 {:a 1 :b :c}
@@ -74,11 +74,11 @@
     (dissoc :b)
     :a)
 
-;; ;; `lookup` fails becaus :b not in the map
-;; (-> {:a 1 :b :c}
-;;     (assoc ::y "your name")
-;;     (dissoc :b)
-;;     :b)
+;; `lookup` fails becaus :b not in the map
+(-> {:a 1 :b :c}
+    (assoc ::y "your name")
+    (dissoc :b)
+    :b)
 
 ;; Define VAT
 (def VAT 0.20)
@@ -94,12 +94,12 @@
 
 ;; Type checker tells me I can't call this
 ;; What's the type of `add-final-total`?
-;; (add-final-total {:something 1})
+(add-final-total {:something 1})
 
-;; I haven't written any types
 
 (let [x {:ex-vat-total 500.0}]
   (add-final-total x))
+;; I haven't written any types
 
 ;; Doesn't make assumptions about what else is in the map
 ;; It just cares about the types needed to fulfil the function
@@ -137,21 +137,22 @@
     (Left  a) (:something a)
     (Right _) 500))
 
+
+;; Different logical interpreter
+(def list-of-eithers
+  (->> () (cons (Right 1)) (cons (Left {:something 2}))))
+
+
+;; Hole DD / type search
+;; what type of thing belongs here
+(map _? list-of-eithers)
+
 (defn some-other-function [condition either-val]
   (if condition
     (case either-val
       (Left  a) (Just (:something a))
       (Right b) Nothing)
     Nothing))
-
-;; Different logical interpreter
-
-(def list-of-eithers
-  (->> () (cons (Right 1)) (cons (Left {:something 2}))))
-
-
-;; Hole DD / type search
-;; (map _? list-of-eithers)
 
 (def list-of-eithers-2
   (->> ()
@@ -161,33 +162,8 @@
        (cons (Left {:something "this"}))))
 
 ;; If the types are refined enough, why not just fill it in
-;; (map (_? true) list-of-eithers-2)
+(map (_? true) list-of-eithers-2)
 
-;; ;; ;; Seen what Idris can do?
-
-;; TODO: compelling macro?
-;; (defmacro macro-test [expr]
-;;   (let [[s ast] (check/infer @type/type-env (parse/parse expr))]
-;;     (cond (check/unifies? ast (List a))
-;;           `(map inc ~expr)
-;;           (check/unifies? ast Int)
-;;           `(+ ~expr 666)
-;;           (check/unifies? ast Boolean)
-;;           :hey!)))
-
-
-;; ;; (macro-test (map identity (cons 1 (cons 1 (list)))))
-
-;; ;; (macro-test (+ 3 4))
-
-;; ;; (macro-test (= 10 5))
-
-;; ;; Since we have inserted an analysis step
-;; ;; we can do automatic currying
-;; (map (+ 2) [1 2 3])
-
-;; (mdo [a (Just 1)]
-;;   (return (inc a)))
 
 ;; Type safe containers, asserting an invariant is held when creating a type
 ;; that way, you can't construct an invalid state
