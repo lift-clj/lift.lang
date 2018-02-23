@@ -74,7 +74,7 @@
                                     :recmap (s/map-of keyword? ::type)))))
 
 (s/def ::row
-  (s/map-of (s/or :type-var ::type-var :| #{'|}) ::type))
+  (s/map-of (s/or :type-var ::type-var :| #{'|} :kw keyword?) ::type))
 
 (s/def ::type
   (s/or :unit          ::unit
@@ -179,7 +179,9 @@
 (defmethod construct :row [[_ ast]]
   (let [r (some-> ast (get '|) second (Var.))]
     (->> (dissoc ast '|)
-         (map (fn [[k v]] [(construct [:type-var k]) (construct v)]))
+         (map (fn [[k v]] [(construct (cond (keyword? k) [:type-const k]
+                                           (symbol?  k) [:type-var k]))
+                          (construct v)]))
          (reduce (fn [row [k v]] (Row. k v row)) (or r (RowEmpty.)))
          (Record.))))
 
@@ -202,7 +204,6 @@
 (defn intern-type-sig [type sig]
   (let [sigma (Forall. (base/ftv sig) sig)]
     (swap! type-env assoc type sigma)
-    (prn (get @type-env type))
     (base/$ type sigma)))
 
 (defmacro intern-signature

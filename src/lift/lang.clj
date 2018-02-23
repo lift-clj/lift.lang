@@ -65,7 +65,7 @@
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)
 (data Either a b = Left a | Right b)
-(data Pair a b = Pair a b)
+;; (data Pair a b = Pair a b)
 
 (interface (Eq a)
   (=    (a -> a -> Boolean))
@@ -89,10 +89,10 @@
     ([Nothing   Nothing] True)
     ([_         _      ] False)))
 
-(impl (Eq Pair)
-  (=
-    ([(Pair a b) (Pair c d)]
-     (if (= a c) (= b d) False))))
+;; (impl (Eq Pair)
+;;   (=
+;;     ([(Pair a b) (Pair c d)]
+;;      (if (= a c) (= b d) False))))
 
 ;; (impl (Eq Pair)
 ;;   (= [x y]
@@ -110,11 +110,11 @@
 (impl (Read Character)
   (read [s] (prim/readCharacter s)))
 
-(interface (Coercible a b)
-  (coerce (a -> b)))
+;; (interface (Coercible a b)
+;;   (coerce (a -> b)))
 
-(impl (Coercible String Long)
-  (coerce [a] (read a)))
+;; (impl (Coercible String Long)
+;;   (coerce [a] (read a)))
 
 (interface (Named a)
   (name (a -> String)))
@@ -163,17 +163,17 @@
 (impl (Functor Vector)
   (map [f xs] (prim/mapVector f xs)))
 
-(interface (Monad m)
-  (return (a -> m a))
-  (>>=    (m a -> (a -> m b) -> m b))
-  (>>     (m a -> m b -> m b)))
+;; (interface (Monad m)
+;;   (return (a -> m a))
+;;   (>>=    (m a -> (a -> m b) -> m b))
+;;   (>>     (m a -> m b -> m b)))
 
-(impl (Monad Maybe)
-  (return
-    ([a] (Just a)))
-  (>>=
-    ([(Just x) f] (f x))
-    ([Nothing  _] Nothing)))
+;; (impl (Monad Maybe)
+;;   (return
+;;     ([a] (Just a)))
+;;   (>>=
+;;     ([(Just x) f] (f x))
+;;     ([Nothing  _] Nothing)))
 
 ;; (with-ctor
 ;;   (data Email = Email String)

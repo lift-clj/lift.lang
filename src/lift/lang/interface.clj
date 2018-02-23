@@ -10,7 +10,8 @@
    [lift.lang.util :as u]
    [lift.lang.analyze :as ana]
    [lift.lang.rewrite :as rewrite]
-   [lift.lang.inference :as infer]))
+   [lift.lang.inference :as infer]
+   [lift.lang.type.def :as def]))
 
 (base/import-syntax-types)
 (base/import-type-types)
@@ -99,7 +100,7 @@
           (class? r)
           (symbol (.getSimpleName r))
           :else
-          (u/resolve-sym a))))
+          (def/resolve-sym a))))
 
 (defn impl [[tag & as] impls]
   (let [as     (map resolve-type-param as)

@@ -27,7 +27,7 @@
    [lift.lang.type.base Forall Let Literal Mark Prim SyntaxNode Var]
    [lift.lang.type.impl Type]))
 
-(def ^:dynamic *type-check* false)
+(def ^:dynamic *type-check* true)
 (def ^:dynamic *prn-type* false)
 
 (def ignore
@@ -122,10 +122,10 @@
                 t'   (type/substitute t sub)]
             (if (def? code)
               (let [name (second code)]
-                (c/eval (list 'def name ret))
+                (c/eval top-level-expr)
                 (let [v     (u/resolve-sym name)
                       sig   (type/get-type @type/type-env v)
-                      _ (prn v sig)
+                      _ (prn v (type v) sig)
                       sigma (Forall. (base/ftv t') t')
                       _ (prn v sigma)
                       sig   (if sig

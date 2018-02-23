@@ -43,6 +43,7 @@
   ([_Gamma sub [SyntaxNode
            [Symbol f]
            [Predicated [[Predicate ptag as :as p]] [Arrow :as t]] :as syn]]
+   (prn 'here f)
    (if (infer/concrete-instance? p)
      (let [[_ as' :as inst] (infer/concrete-instance p)
            [sub'] (some->> (map (fn [a a']
