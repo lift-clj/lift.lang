@@ -236,12 +236,16 @@
   (let [t? (type-of-expr-at-point msg)]
     (if (instance? Throwable t?)
       t?
-      (->> @type/type-env
-           (keep (fn [[k v]]
-                   (try
-                     (when (and (not (impl? k)) (unify/unify (:t t?) (:t v)))
-                       k)
-                     (catch Throwable _))))))))
+      (let [t' (infer/instantiate (Forall. (base/ftv (:t t?)) (:t t?)))]
+        (->> @type/type-env
+             (keep (fn [[k v]]
+                     (try
+                       (when (not (impl? k))
+                         (let [vt (infer/instantiate v)]
+                           ;; (prn k vt)
+                           (when (unify/unify t' vt)
+                             k)))
+                       (catch Throwable _)))))))))
 
 (defn type-replace-expr-at-point [msg]
   (let [t? (type-search-expr-at-point msg)]
