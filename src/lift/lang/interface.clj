@@ -35,14 +35,16 @@
     (reduce #(% %2) f args)))
 
 (defn get-impl [d vars f sig arglist]
-  (let [sub (->> arglist
-                 (map (fn [s a]
-                        (and (instance? Var s)
-                             (contains? vars (:a s))
-                             (t/sub {(:a s) (ana/type (Literal. a))})))
-                      (sig/arrseq sig))
-                 (filter identity)
-                 (apply unify/compose))
+  (let [sub (or (some->> arglist
+                         (map (fn [s a]
+                                (and (instance? Var s)
+                                     (contains? vars (:a s))
+                                     (t/sub {(:a s) (ana/type (Literal. a))})))
+                              (sig/arrseq sig))
+                         (filter identity)
+                         (seq)
+                         (apply unify/compose))
+                t/id)
         d' (t/substitute d sub)]
     (uncurry
      (eval
