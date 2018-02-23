@@ -10,6 +10,8 @@
    [lift.lang.type :as type]
    [lift.lang.type.data :as data]))
 
+(type/def List      (List a))
+(type/def Vector    (Vector a))
 (type/def not       (Boolean -> Boolean))
 (type/def instance? (Class -> a -> Boolean))
 (type/def inc       (Long -> Long))

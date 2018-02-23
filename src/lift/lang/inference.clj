@@ -33,6 +33,7 @@
      (every? can? as)))
   ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
+(str (@t/type-env 'lift.lang.prim/mapList))
 (defn lookup [_Gamma a]
   (or (and (= '_? a) [a (Forall. #{} (Var. (gensym 'a)))])
       (if-let [t (get _Gamma a)] [a t])

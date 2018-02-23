@@ -27,7 +27,7 @@
 (defn resolve-sym
   ([ns s]
    (if (namespace s)
-     (some->> s (try-ns-resolve ns) u/->sym)
+     (or (some->> s (try-ns-resolve ns) u/->sym) s)
      (or (some->> s (try-ns-resolve ns) u/->sym)
          (let [s' (symbol (name (ns-name ns)) (name s))]
            (or (when (get-type @type-env s') s')
@@ -200,15 +200,13 @@
   type)
 
 (defn intern-type-sig [type sig]
-  (swap! type-env assoc type (Forall. (base/ftv sig) sig))
-  type)
+  (let [sigma (Forall. (base/ftv sig) sig)]
+    (swap! type-env assoc type sigma)
+    (prn (get @type-env type))
+    (base/$ type sigma)))
 
 (defmacro intern-signature
   ([type]
    `(intern-type-only (type-signature '~type)))
   ([type sig]
    `(intern-type-sig '~(resolve-sym type) (type-signature '~sig))))
-
-;; (map (comp prn key) @type-env)
-
-;; (@type-env 'Pair)

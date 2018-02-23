@@ -44,7 +44,7 @@
 (defmethod print-method Ret [o w]
   (.write w (format "%s = %s" (pr-str (.-x o)) (pr-str (.-t o)))))
 
-(defn toggle []
+(defn toggle-type-checker [& _]
   (Ret. '*type-check* (alter-var-root #'*type-check* not)))
 
 (defn read-colon [reader initch opts pending-forms]
@@ -107,7 +107,8 @@
 
 (defn lift [top-level-expr]
   (try
-    (if (and (seq? top-level-expr) (ignore? top-level-expr))
+    (if (or (not *type-check*)
+            (and (seq? top-level-expr) (ignore? top-level-expr)))
       (c/eval top-level-expr)
       (let [code (u/macroexpand-all top-level-expr)
             [s [_ t err :as expr]] (check code)]
@@ -122,10 +123,19 @@
             (if (def? code)
               (let [name (second code)]
                 (c/eval (list 'def name ret))
-                (let [v (u/resolve-sym name)
-                      sigma (Forall. (base/ftv t') t')]
-                  (swap! type/type-env assoc v sigma)
-                  (base/$ (resolve v) t')))
+                (let [v     (u/resolve-sym name)
+                      sig   (type/get-type @type/type-env v)
+                      _ (prn v sig)
+                      sigma (Forall. (base/ftv t') t')
+                      _ (prn v sigma)
+                      sig   (if sig
+                              (do (unify/unify (infer/instantiate sig)
+                                               (infer/instantiate sigma))
+                                  sig)
+                              sigma)]
+                  (prn sig)
+                  (swap! type/type-env assoc v sig)
+                  (base/$ (resolve v) sig)))
               (let [ret' (pr-str (c/eval ret))]
                 (base/$ ret' t')))))))
     (catch Throwable t
@@ -251,7 +261,7 @@
               :code [(assoc code' :ns (symbol ns))]))
       (let [eval (case op "eval" `lift "load-file" `lift)]
         (if lift?
-          (-> (assoc msg :eval eval :code code)
+          (-> (assoc msg :eval eval :code [code'])
               (cond-> (= op "load-file") (dissoc :ns))
               (handler))
           (handler msg))))))

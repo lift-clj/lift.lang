@@ -5,21 +5,16 @@
   {:lang :lift/clojure}
   (:refer-clojure :exclude [+ * - / = case defn let map name read not=])
   (:require
+   [clojure.core :as c]
    [lift.lang :refer :all]
-   [lift.lang.monad :as m]))
+   [lift.lang.monad :as m]
+   [lift.lang.type :as t]))
 
-;; ;; automatic currying
+;; automatic currying
 ;; (map (+ 2) [1 2 3])
 
-;; (let [a 1] a)
-
-
 ;; (m/do [a (Just 1)]
-;;   (return (pos? a)))
-
-;; (let [x (Pair 1 2)]
-;;   (let [(Just a) x]
-;;     a))
+;;   (return (inc a)))
 
 ;; (with-ctor
 ;;   (data Email = Email String)
@@ -31,45 +26,28 @@
 ;;   (coerce
 ;;     ([(Email s)] s)))
 
-;; (Email "not-a-real-email")
+;; (def fake-email? (Email "not-a-real-email"))
+;; (def my-email? (Email "me@andrewmcveigh.com"))
 
-;; (Email "me@andrewmcveigh.com")
-
-;; (case (Email "andrew@test")
+;; (case my-email?
 ;;   (Just e) (coerce e)
 ;;   Nothing  "oops")
 
-;; (case (Just (Just 1))
-;;   (Just (Just x)) x
-;;   )
-;; (>>= (Just 1) (fn [a] (Just (inc a))))
+;; ;; (map inc (Just 1))
+;; ;; (map inc '(1 2 3))
 
-;; (map inc (Just 1))
-;; (map inc '(1 2 3))
+;; ;; (map inc [1 2 3])
 
-;; (map inc [1 2 3])
-
+;; ;; TODO: define = here
 ;; (= (Just (Just (Just 1))) (Just (Just (Just 1))))
 
-;; (= (Just 1) (Just 1))
-
-;; ;; ;; (Just 1)
 ;; (= (Pair 1 2) (Pair 1 2))
 
-;; (Pair 1 2)
+;; (+ 1 (coerce "2"))
 
-;; (Just 1)
-;; (_? (Just 1) (Just 1))
+;; ;; (not (pos? 1))
 
-;; '(1 2 3)
-
-;; [1 "" 3]
-
-;; (= 1 (coerce "1"))
-
-;; (not (pos? 1))
-
-;; (not (pos? "this is a string, fool"))
+;; ;; (not (pos? "this is a string, fool"))
 
 ;; (= 1 (coerce "1"))
 
@@ -107,7 +85,7 @@
 
 ;; ;; (fn [a b] a)
 
-;; ;; (get {:a 1 :b 2} :a)
+;; (:a {:a 1 :b 2})
 
 ;; (assoc {} :a 2 :b 2 :c "test")
 
@@ -120,12 +98,15 @@
 ;; (:a {:a 1})
 
 
+;; (t/def  inc-point (Long -> Long -> Vector Long))
+;; (c/defn inc-point [x y]
+;;   [(inc x) (inc y)])
 
-;; ;; ;; Typically, you're writing a function... and running it in the REPL
-;; ;; (defn ill-typed-function [x]
-;; ;;   (+ x "string"))
+;; ;; Typically, you're writing a function... and running it in the REPL
+;; (defn ill-typed-function [x]
+;;   (inc-point x "string"))
 
-;; ;; (ill-typed-function 1)
+;; (ill-typed-function 1)
 
 ;; ;; ;; turn type-checking `ON`
 

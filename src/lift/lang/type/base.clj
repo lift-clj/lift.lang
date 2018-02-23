@@ -9,6 +9,9 @@
    [clojure.lang IFn ILookup IPersistentMap]
    [lift.lang.type.impl Type]))
 
+(extend-protocol Functor
+  nil (-map [_ _] nil))
+
 (defprotocol Ftv (-ftv [x]))
 
 (extend-protocol Ftv
