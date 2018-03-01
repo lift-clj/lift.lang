@@ -6,7 +6,6 @@
    [clojure.spec.alpha :as s]
    [lift.f.functor :as f]
    [lift.lang.pattern :as p]
-   [lift.lang.type :as t]
    [lift.lang.type.base :as base :refer [$]]
    [lift.lang.type.impl :refer [ana]]
    [lift.lang.util :refer [resolve-sym]]
@@ -17,9 +16,6 @@
 (base/import-container-types)
 (base/import-syntax-types)
 (base/import-type-types)
-
-;; (defn prim? [x]
-;;   (and (simple-symbol? x) (contains? @t/type-env x)))
 
 (defn class-name? [x]
   (and (symbol? x) (class? (resolve x))))
@@ -97,6 +93,8 @@
 (s/def ::record
   (s/and (complement record?) (s/map-of keyword? any?)))
 
+(s/def ::set set?)
+
 (s/def ::record-expr
   (s/or :Var ::var
         :Lit ::literal
@@ -123,7 +121,8 @@
         :App ::application
         :Lst ::list
         :Vec ::vector
-        :Rec ::record))
+        :Rec ::record
+        :Ste ::set))
 
 (defn curry [op args]
   (if (seq args)
@@ -190,6 +189,8 @@
 (defmethod -parse :Vec [_ expr] (Vector. expr))
 
 (defmethod -parse :Rec [_ expr] (Map. expr))
+
+(defmethod -parse :Set [_ expr] (Set. expr))
 
 (defmethod -parse :Sel [_ [op arg]]
   (Select. op arg))

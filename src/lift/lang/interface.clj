@@ -3,7 +3,7 @@
   (:require
    [clojure.core :as c]
    [lift.lang.signatures :as sig]
-   [lift.lang.type :as t]
+   [lift.lang.type :as type]
    [lift.lang.type.base :as base]
    [lift.lang.type.impl :as impl]
    [lift.lang.unification :as unify]
@@ -39,20 +39,20 @@
                          (map (fn [s a]
                                 (and (instance? Var s)
                                      (contains? vars (:a s))
-                                     (t/sub {(:a s) (ana/type (Literal. a))})))
+                                     (type/sub {(:a s) (ana/type (Literal. a))})))
                               (sig/arrseq sig))
                          (filter identity)
                          (seq)
                          (apply unify/compose))
-                t/id)
-        d' (t/substitute d sub)]
+                type/id)
+        d' (type/substitute d sub)]
     (uncurry
      (eval
       (rewrite/emit
        (rewrite/rewrite
-        @t/type-env
+        @type/env
         nil
-        (get (get @t/type-env d') (u/resolve-sym f))))))))
+        (get (get @type/env d') (u/resolve-sym f))))))))
 
 (defn default-impl [f sig pred t impl]
   (let [{:keys [arglist args]} (sig/arglist sig)]
@@ -67,9 +67,9 @@
          (apply impl# (apply concat ~args))))))
 
 (defn type-sig-impl [f sig pred]
-  `(swap! t/type-env assoc
+  `(swap! type/env assoc
           '~(u/resolve-sym f)
-          (Forall. (t/ftv ~sig) (Predicated. [~pred] ~sig))))
+          (Forall. (type/ftv ~sig) (Predicated. [~pred] ~sig))))
 
 (defn interface
   {:style/indent :defn}
@@ -84,7 +84,7 @@
             `[~(default-impl f sig pred t impl)
               ~(type-sig-impl f sig pred)])
           fns)
-       (swap! t/type-env assoc '~class ~pred)
+       (swap! type/env assoc '~class ~pred)
        '~t)))
 
 (def clojure-imports
@@ -107,11 +107,11 @@
 (defn impl [[tag & as] impls]
   (let [as     (map resolve-type-param as)
         consts (mapv #(Const. %) as)
-        tag-ts (map #(or (some-> (t/find-type @t/type-env %) infer/instantiate)
+        tag-ts (map #(or (some-> (type/find-type @type/env %) infer/instantiate)
                          (Const. %)) as)
-        [_ bs] (get @t/type-env tag)
+        [_ bs] (get @type/env tag)
         pred   (Predicate. tag consts)
-        sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) t/sub)]
+        sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) type/sub)]
     `(do
-       (swap! t/type-env assoc ~pred ~(sig/impl pred sub impls))
+       (swap! type/env assoc ~pred ~(sig/impl pred sub impls))
        '~pred)))

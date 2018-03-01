@@ -1,13 +1,12 @@
-
-(ns demo
-  {:lang :lift/clojure}
-  ;; ^^ `metadata` on namespace
-  ;; means namespace will be type-checked when turned on
-  (:refer-clojure :exclude [+ * - / = case defn let map name read not=])
-  (:require
-   [clojure.core :as c]
-   [lift.lang :refer :all]
-   [lift.lang.type :as t]))
+;; (ns demo
+;;   {:lang :lift/clojure}
+;;   ;; ^^ `metadata` on namespace
+;;   ;; means namespace will be type-checked when turned on
+;;   (:refer-clojure :exclude [+ * - / = case defn let map name read not=])
+;;   (:require
+;;    [clojure.core :as c]
+;;    [lift.lang :refer :all]
+;;    [lift.lang.type :as t]))
 
 ;; ;; A few type annotations for `clojure.core`
 ;; (t/def (List a))
@@ -38,192 +37,193 @@
 ;; (t/def map       ((a -> b) -> (List a) -> (List b)))
 
 
-(t/def  inc-point (Long -> Long -> Vector Long))
-(defn inc-point [x y]
-  [(inc x) (inc y)])
+;; (t/def  inc-point (Long -> Long -> Vector Long))
+;; (defn inc-point [x y]
+;;   [(inc x) (inc y)])
 
-;; toggle `*type-check*` `OFF`
-;; Typically, you're writing a function... and running it in the REPL
+;; ;; toggle `*type-check*` `OFF`
+;; ;; Typically, you're writing a function... and running it in the REPL
 ;; (defn ill-typed-function [x]
 ;;   (inc-point x "string"))
 
 ;; (ill-typed-function 1)
 
-;; ;; turn type-checking `ON`
+;; ;; ;; turn type-checking `ON`
 
-;; ;; Don't need to run it
+;; ;; ;; Don't need to run it
 
 ;; (defn ill-typed-function [x]
 ;;   (inc-point x "string"))
 
-;; Extensible records, with row types
-{:a 1 :b :c}
+;; ;; Extensible records, with row types
+;; {:a 1 :b :c}
 
-;; `assoc` adds key/type `::y : String`
-(-> {:a 1 :b :c}
-    (assoc ::y "your name"))
+;; ;; `assoc` adds key/type `::y : String`
+;; (-> {:a 1 :b :c}
+;;     (assoc ::y "your name"))
 
-;; `dissoc` removes key/type `:b : Keyword`
-(-> {:a 1 :b :c}
-    (assoc ::y "your name")
-    (dissoc :b))
+;; ;; `dissoc` removes key/type `:b : Keyword`
+;; (-> {:a 1 :b :c}
+;;     (assoc ::y "your name")
+;;     (dissoc :b))
 
-;; `lookup` gets the value and type
-(-> {:a 1 :b :c}
-    (assoc ::y "your name")
-    (dissoc :b)
-    :a)
+;; ;; `lookup` gets the value and type
+;; (-> {:a 1 :b :c}
+;;     (assoc ::y "your name")
+;;     (dissoc :b)
+;;     :a)
 
-;; `lookup` fails becaus :b not in the map
-(-> {:a 1 :b :c}
-    (assoc ::y "your name")
-    (dissoc :b)
-    :b)
+;; ;; `lookup` fails becaus :b not in the map
+;; (-> {:a 1 :b :c}
+;;     (assoc ::y "your name")
+;;     (dissoc :b)
+;;     :b)
 
-;; Define VAT
-(def VAT 0.20)
+;; ;; Define VAT
+;; (def VAT 0.20)
 
-;; A function using VAT
-(defn with-vat [x]
-  (* (+ 1.0 VAT) x))
+;; ;; A function using VAT
+;; (defn with-vat [x]
+;;   (* (+ 1.0 VAT) x))
 
-;; Another function using that function
-(defn add-final-total [rental-pricing]
-  (assoc rental-pricing
-         :total (with-vat (:ex-vat-total rental-pricing))))
+;; ;; Another function using that function
+;; (defn add-final-total [rental-pricing]
+;;   (assoc rental-pricing
+;;          :total (with-vat (:ex-vat-total rental-pricing))))
 
-;; Type checker tells me I can't call this
-;; What's the type of `add-final-total`?
+;; ;; What's the type of `add-final-total`?
+;; ;; Type checker tells me I can't call this
 ;; (add-final-total {:something 1})
 
 
-(let [x {:ex-vat-total 500.0}]
-  (add-final-total x))
-;; I haven't written any types
+;; (let [x {:ex-vat-total 500.0}]
+;;   (add-final-total x))
+;; ;; I haven't written any types
 
-;; Doesn't make assumptions about what else is in the map
-;; It just cares about the types needed to fulfil the function
-(let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
-  (add-final-total x))
+;; ;; Doesn't make assumptions about what else is in the map
+;; ;; It just cares about the types needed to fulfil the function
+;; (let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
+;;   (add-final-total x))
 
-;; But it keeps those keys->types around
-;; So we could use it later in the program
-(let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
-  (:something-else (add-final-total x)))
+;; ;; But it keeps those keys->types around
+;; ;; So we could use it later in the program
+;; (let [x {:ex-vat-total 500.0 :something-else "This thing?"}]
+;;   (:something-else (add-final-total x)))
 
-(defn deep-map-returning-fn [id]
-  (-> {}
-      (assoc :a {:b {:c {:d id}}})
-      (assoc :e {:f {:g 30}})
-      (assoc :h {:i "wut"})))
+;; (defn deep-map-returning-fn [id]
+;;   (-> {}
+;;       (assoc :a {:b {:c {:d id}}})
+;;       (assoc :e {:f {:g 30}})
+;;       (assoc :h {:i "wut"}))
+;;   )
 
-;; Tells you things about your data (\space t e)
-(deep-map-returning-fn 1142)
+;; ;; Tells you things about your data (\space t e)
+;; (deep-map-returning-fn 1142)
 
-;; You don't need to 'run' it, you can ask what type of thing this expr would
-;; return
-(:a (deep-map-returning-fn 1142))
+;; ;; You don't need to 'run' it, you can ask what type of thing this expr would
+;; ;; return
+;; (:a (deep-map-returning-fn 1142))
 
-;; Testing out different syntax elements, inspect types
-(case (let [a (Left {:something "Hi!"})
-            b (Right "test")
-            c false]
-        ((fn [y] (let [x y] (if c x b))) a))
-  (Left  a) (:something a)
-  (Right b) b)
+;; ;; Testing out different syntax elements, inspect types
+;; (case (let [a (Left {:something "Hi!"})
+;;             b (Right "test")
+;;             c false]
+;;         ((fn [y] (let [x y] (if c x b))) a))
+;;   (Left  a) (:something a)
+;;   (Right b) b)
 
-(defn some-function [either-val]
-  (case either-val
-    (Left  a) (:something a)
-    (Right _) 500))
-
-
-;; Different logical interpreter
-(def list-of-eithers
-  (->> () (cons (Right 1)) (cons (Left {:something 2}))))
+;; (defn some-function [either-val]
+;;   (case either-val
+;;     (Left  a) (:something a)
+;;     (Right _) 500))
 
 
-;; Hole DD / type search
-;; what type of thing belongs here
+;; ;; Different logical interpreter
+;; (def list-of-eithers
+;;   (->> () (cons (Right 1)) (cons (Left {:something 2}))))
+
+
+;; ;; Hole DD / type search
+;; ;; what type of thing belongs here
 ;; (map _? list-of-eithers)
 
-(defn some-other-function [condition either-val]
-  (if condition
-    (case either-val
-      (Left  a) (Just (:something a))
-      (Right b) Nothing)
-    Nothing))
+;; (defn some-other-function [condition either-val]
+;;   (if condition
+;;     (case either-val
+;;       (Left  a) (Just (:something a))
+;;       (Right b) Nothing)
+;;     Nothing))
 
-(def list-of-eithers-2
-  (->> ()
-       (cons (Right "Err"))
-       (cons (Left {:something "coffee"}))
-       (cons (Right "Err2"))
-       (cons (Left {:something "this"}))))
+;; (def list-of-eithers-2
+;;   (->> ()
+;;        (cons (Right "Err"))
+;;        (cons (Left {:something "coffee"}))
+;;        (cons (Right "Err2"))
+;;        (cons (Left {:something "this"}))))
 
-;; If the types are refined enough, why not just fill it in
+;; ;; If the types are refined enough, why not just fill it in
 ;; (map (_? true) list-of-eithers-2)
 
 
-;; Use a smart type constructor to assert an invariant is held when creating a
-;; type that way, you can't construct an invalid state
-(with-ctor
-  (data Email = Email String)
-  (String -> Maybe Email)
-  (fn [s]
-    (if (.contains s "@") (Just (Email s)) Nothing)))
+;; ;; Use a smart type constructor to assert an invariant is held when creating a
+;; ;; type that way, you can't construct an invalid state
+;; (with-ctor
+;;   (data Email = Email String)
+;;   (String -> Maybe Email)
+;;   (fn [s]
+;;     (if (.contains s "@") (Just (Email s)) Nothing)))
 
-(Email "not-a-real-email")
-(Email "me@andrewmcveigh.com")
+;; (Email "not-a-real-email")
+;; (Email "me@andrewmcveigh.com")
 
-;; but, it can be a pain to have to unwrap these things all the time
-;; so we can define a one-way coercion
-(interface (Coercible a b)
-  (coerce (a -> b)))
+;; ;; but, it can be a pain to have to unwrap these things all the time
+;; ;; so we can define a one-way coercion
+;; (interface (Coercible a b)
+;;   (coerce (a -> b)))
 
-;; as long as Coercible is defined for type a and type b
-(impl (Coercible String Long)
-  (coerce [a] (read a)))
+;; ;; as long as Coercible is defined for type a and type b
+;; (impl (Coercible String Long)
+;;   (coerce [a] (read a)))
 
-;; so here we define coercible from email to string, by unwrapping it
-(impl (Coercible Email String)
-  (coerce ([(Email s)] s)))
+;; ;; so here we define coercible from email to string, by unwrapping it
+;; (impl (Coercible Email String)
+;;   (coerce ([(Email s)] s)))
 
-;; Here I'm annotating the type so that I can get the compiler to work out
-;; which implementation I want below
-;; So it's not passive code to _satisfy_ the compiler, this signature is
-;; actively directing the _return type_ polymorphism
-(t/def person (String -> String -> {:name String :email String}))
-(defn  person [name email]
-  {:name name :email email})
+;; ;; Here I'm annotating the type so that I can get the compiler to work out
+;; ;; which implementation I want below
+;; ;; So it's not passive code to _satisfy_ the compiler, this signature is
+;; ;; actively directing the _return type_ polymorphism
+;; (t/def person (String -> String -> {:name String :email String}))
+;; (defn  person [name email]
+;;   {:name name :email email})
 
-;; no demo of a type system for a functional programming language would be
-;; complete without an implementation of `Monad`
-(interface (Monad m)
-  (return (a -> m a))
-  (>>=    (m a -> (a -> m b) -> m b)))
+;; ;; no demo of a type system for a functional programming language would be
+;; ;; complete without an implementation of `Monad`
+;; (interface (Monad m)
+;;   (return (a -> m a))
+;;   (>>=    (m a -> (a -> m b) -> m b)))
 
-;; Here's the Maybe Monad instance
-(impl (Monad Maybe)
-  (return ([a] (Just a)))
-  (>>=
-    ([(Just x) f] (f x))
-    ([Nothing  _] Nothing)))
+;; ;; Here's the Maybe Monad instance
+;; (impl (Monad Maybe)
+;;   (return ([a] (Just a)))
+;;   (>>=
+;;     ([(Just x) f] (f x))
+;;     ([Nothing  _] Nothing)))
 
-;; And do notation in a two line macro. Clojure is still really powerful
-(defmacro mdo
-  {:style/indent :defn}
-  [bindings expr]
-  (->> (reverse (partition 2 bindings))
-       (reduce (fn [expr [sym mv]] `(demo/>>= ~mv (fn [~sym] ~expr))) expr)))
+;; ;; And do notation in a two line macro. Clojure is still really powerful
+;; (defmacro mdo
+;;   {:style/indent :defn}
+;;   [bindings expr]
+;;   (->> (reverse (partition 2 bindings))
+;;        (reduce (fn [expr [sym mv]] `(demo/>>= ~mv (fn [~sym] ~expr))) expr)))
 
 ;; ;; can you see what's going on here?
 ;; (mdo [email (Email "me@andrewmcveigh.com")]
 ;;   (return (person "Andrew" (coerce email))))
 
-;; the monadic do notation is looking under the Maybe of `my-email?`, binding
-;; the actual `Email` to `email`.
-;; Then the `coerce` instance from `Email` `->` `String` is being picked by the
-;; type system, because the 2nd argument of `person` is of type `String`.
-;; And then, `return`, also polymorphic in the Monad return type, in this case
-;; `Maybe`
+;; ;; the monadic do notation is looking under the Maybe of `my-email?`, binding
+;; ;; the actual `Email` to `email`.
+;; ;; Then the `coerce` instance from `Email` `->` `String` is being picked by the
+;; ;; type system, because the 2nd argument of `person` is of type `String`.
+;; ;; And then, `return`, also polymorphic in the Monad return type, in this case
+;; ;; `Maybe`

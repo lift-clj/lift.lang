@@ -2,8 +2,7 @@
   (:refer-clojure :exclude [case defn let])
   (:require
    [clojure.core :as c]
-   [clojure.spec.alpha :as s]
-   [lift.lang.type :as t]))
+   [clojure.spec.alpha :as s]))
 
 (s/def ::type-name
   (s/and simple-symbol? #(re-matches #"^[A-Z][A-Za-z]*$" (name %))))

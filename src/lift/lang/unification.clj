@@ -4,18 +4,15 @@
    [lift.f.functor :as f]
    [lift.lang.analyze :as ana]
    [lift.lang.pattern :as p]
-   [lift.lang.type :as t]
-   [lift.lang.type.base :as base]
+   [lift.lang.type.base :as base :refer [id]]
    [lift.lang.type.impl :refer [cata]]
    [lift.lang.util :as u]))
 
 (base/import-container-types)
 (base/import-type-types)
 
-(def id (t/sub {}))
-
 (defn occurs? [x expr]
-  (contains? (t/ftv expr) x))
+  (contains? (base/ftv expr) x))
 
 (declare unify)
 
@@ -24,7 +21,7 @@
                (if-let [v' (k init)]
                  (let [[s] (unify v' v)]
                    (-> init
-                       (assoc k (t/substitute v' s))
+                       (assoc k (base/substitute v' s))
                        (merge s)))
                  (assoc init k v)))
              a
@@ -32,18 +29,18 @@
 
 (defn compose
   ([s1 s2]
-   (unify-merge s1 (f/map #(t/substitute % s1) s2)))
+   (unify-merge s1 (f/map #(base/substitute % s1) s2)))
   ([s1 s2 & ss]
    (reduce compose (conj ss s2 s1))))
 
 (defn bind [a t]
   (cond (= t (Var. a)) id
         (occurs? a t)  (throw (ex-info "Infinite Type" {:a a :t t}))
-        :else          (t/sub {a t})))
+        :else          (base/sub {a t})))
 
 (defn unify-arrow [l l' r r']
   (let [s1 (unify l l')
-        s2 (unify (t/substitute r s1) (t/substitute r' s1))]
+        s2 (unify (base/substitute r s1) (base/substitute r' s1))]
     (compose s2 s1)))
 
 (defn unify-compound [t1 tag1 t1-args t2 tag2 t2-args]
@@ -80,7 +77,7 @@
 
   ([l t [Var a]] ; this is the case where r is a tv
    (let [row (Row. l t (Var. a))]
-     [(t/sub {a row}) row]))
+     [(base/sub {a row}) row]))
 
   ([_ _ x]
    (throw (Exception. (format "Expected row type, got %s" (pr-str x))))))
@@ -102,7 +99,7 @@
    ;; side ^^ condition needed here on tail before rewrite
    ;; must not already be bound (by bind)
    (let [[s row''] (rewrite-row k v row')]
-     (compose (unify (t/substitute tail s) row'') s)))
+     (compose (unify (base/substitute tail s) row'') s)))
 
   ([[Record row] [Record row']]
    (unify row row'))

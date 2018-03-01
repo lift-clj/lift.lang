@@ -27,7 +27,8 @@
      ~args
      :implements
      [clojure.lang.Indexed
-      lift.lang.type.impl.Show]
+      lift.lang.type.impl.Show
+      lift.lang.type.impl.Type]
      (nth [_# i#] (nth ~args i#))
      (-show [_#]
        (format "(%s %s)" ~(str tag) (string/join " " (map pr-str ~args))))))
@@ -76,7 +77,6 @@
         type-expr (apply list tag args)
         sig (def/type-signature type-expr)]
     `(do
-       ;; (swap! t/type-env assoc '~tag ~sig)
        (def/intern-type-only ~sig)
        ~@(mapcat
           (fn [part]

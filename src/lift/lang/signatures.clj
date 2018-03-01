@@ -8,7 +8,7 @@
    [lift.lang.defn :as defn]
    [lift.lang.inference :as infer :refer [check rel-unify]]
    [lift.lang.pattern :as p]
-   [lift.lang.type :as t]
+   [lift.lang.type :as type]
    [lift.lang.type.base :as base]
    [lift.lang.type.impl :as impl]
    [lift.lang.unification :refer [unify]]
@@ -37,14 +37,6 @@
   (s/cat :op   (s/or :var ::var :type-name ::type-name)
          :args (s/+ (s/& ::simple-expr))))
 
-(comment
-
-  (s/invalid? (s/conform ::type-app '[a & a]))
-
-  (s/valid? ::type-app '[a a])
-
-  )
-
 (s/def ::tuple
   (s/and vector? (s/+ ::type-expr)))
 
@@ -52,12 +44,16 @@
 (s/def ::arrow
   (s/cat :a ::type-expr :-> #{'->} :b ::retype-expr))
 
+(s/def ::set
+  (s/and set? (s/cat :a ::type-expr)))
+
 (s/def ::simple-expr
   (s/alt :var       ::var
          :type-name ::type-name
          :type-app  ::type-app
          :tuple     ::tuple
-         :arrow     (s/and seq? ::arrow)))
+         :arrow     (s/and seq? ::arrow)
+         :set       ::set))
 
 (s/def ::type-expr
   (s/alt :var       ::var
@@ -65,7 +61,8 @@
          :type-name ::type-name
          :type-app  ::type-app
          :tuple     ::tuple
-         :arrow     (s/and seq? ::arrow)))
+         :arrow     (s/and seq? ::arrow)
+         :set       ::set))
 
 (s/def ::retype-expr
   (s/alt :var       ::var
@@ -73,7 +70,8 @@
          :type-name ::type-name
          :type-app  ::type-app
          :tuple     ::tuple
-         :arrow     ::arrow))
+         :arrow     ::arrow
+         :set       ::set))
 
 ;; x.y/z
 (s/def ::name symbol?)
@@ -111,6 +109,9 @@
       (-> c
           (assoc :type :sig)
           (update :sig parse-type-expr)))))
+
+(defn parse-tsig [sig]
+  (u/assert-conform ::type-expr sig))
 
 (defn parse-fn-list-default [expr]
   (let [c (s/conform ::interface-fn-list-default expr)]
@@ -177,7 +178,7 @@
         _Gamma (apply assoc _Gamma (interleave bindings types'))
         [s [_ t :as e]] (infer/checks _Gamma e)
         [p1 t1] (infer/release t)
-        pts (map #(infer/release (t/substitute % s)) (reverse types))
+        pts (map #(infer/release (type/substitute % s)) (reverse types))
         ps  (cons p1 (map first pts))
         t2  (reduce #(Arrow. %2 %) t1 (map second pts))
         e2  (reduce #(Lambda. (Symbol. %2) %) e bindings)]
@@ -185,18 +186,18 @@
 
 (defn check-impl [pred sub f code]
   (let [f        (u/resolve-sym f)
-        _Gamma        (assoc @t/type-env pred ::temp)
+        _Gamma        (assoc @type/env pred ::temp)
         code     (u/macroexpand-all code)
         [s1 syn] (infer/checks _Gamma code)
-        [e t]    (t/substitute syn s1)
+        [e t]    (type/substitute syn s1)
         [as pt]  (get _Gamma f)
         _        (assert pt (format "Symbol %s not found in env" f))
         [ps t']  pt
         _        (assert t')
-        sigma    (infer/instantiate (Forall. as (t/substitute t' sub)))
+        sigma    (infer/instantiate (Forall. as (type/substitute t' sub)))
         [s p]    (rel-unify _Gamma t sigma)
         [_ t]    (infer/release t)]
-    (t/substitute (base/$ e t) s)))
+    (type/substitute (base/$ e t) s)))
 
 (defn default-impl [pred sub {:keys [f arglist expr]}]
   (check-impl pred sub f (list 'fn arglist expr)))
@@ -220,5 +221,3 @@
                 :default (partial default-impl pred sub)
                 :match   (partial match-impl pred sub))]
     (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
-
-;; (@t/type-env 'Pair)

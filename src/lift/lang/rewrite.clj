@@ -22,12 +22,6 @@
 (extend-protocol f/Functor
   clojure.lang.Fn (-map [x f] x))
 
-;; (get @type/type-env 'Maybe)
-;; (get @type/type-env 'Eq)
-
-;; (unify/unify (Container. 'Maybe [(Var. 'a)])
-;;              (Container. 'Maybe [(Const. 'Long)]))
-
 (p/defn unify-predicate
   ([[Predicate t a] [Predicate t' a']]
    (if (and (= t t') (= (count a) (count a')))

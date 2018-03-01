@@ -19,9 +19,21 @@
          (mapcat (fn [[match expr]] `[~(case/tuple n match) ~expr])
                  exprs)))))
 
-(s/def ::arg-pattern (s/alt :sym symbol? :tup ::args-pattern :dst ::case/dtor))
+(c/defn fn-pattern [exprs]
+  (let [n  (count (ffirst exprs))
+        vs (vars n)]
+    `(c/fn [~@vs]
+       ~(case/case*
+         (case/tuple n vs)
+         (mapcat (fn [[match expr]] `[~(case/tuple n match) ~expr])
+                 exprs)))))
+
+(s/def ::arglist      (s/coll-of symbol? :kind vector?))
+(s/def ::no-pattern   (s/cat :arglist ::arglist :expr any?))
+(s/def ::arg-pattern  (s/alt :sym symbol? :tup ::args-pattern :dst ::case/dtor))
 (s/def ::args-pattern (s/and vector? (s/+ ::arg-pattern)))
-(s/def ::pattern (s/and seq? (s/cat :args ::args-pattern :expr any?)))
+(s/def ::one-pattern  (s/cat :arglist ::args-pattern :expr any?))
+(s/def ::pattern      (s/and seq? ::one-pattern))
 
 (c/defn pattern-match? [decl]
   (s/valid? (s/coll-of ::pattern) decl))
@@ -36,3 +48,13 @@
 
 (defmacro defn [name & decl]
   (defn* name decl))
+
+(defn fn- [decl]
+  (cond (pattern-match? decl)
+        (fn-pattern decl)
+        (s/valid? ::no-pattern decl)
+        `(c/fn ~@decl)
+        (s/valid? ::one-pattern decl)
+        (fn-pattern (list decl))
+        :else
+        `(c/fn ~@decl)))

@@ -4,14 +4,15 @@
    [lift.lang.pattern :as p]
    [lift.lang.unification :as unify :refer [compose unify]]
    [lift.lang.util :as u]
-   [lift.lang.type :as t :refer [id]]
-   [lift.lang.type.base :as base :refer [$]]
+   [lift.lang.type.base :as base :refer [id $]]
    [lift.lang.type.impl :refer [cata hylo -vec]]
    [lift.lang.analyze :as ana]
    [clojure.set :as set]
    [lift.lang.type.impl :as impl])
   (:import
    [clojure.lang Fn]))
+
+(def env (atom {}))
 
 (base/import-container-types)
 (base/import-type-types)
@@ -22,7 +23,7 @@
   (f/-map [x _] x))
 
 (defn xi? [x]
-  (and (symbol? x) (= \ξ(first (name x)))))
+  (and (symbol? x) (= \ξ (first (name x)))))
 
 (p/defn assume?
   ([[Predicate _ as]]
@@ -33,7 +34,6 @@
      (every? can? as)))
   ([x] (throw (Exception. (format "Cannot assume %s" (pr-str x))))))
 
-(str (@t/type-env 'lift.lang.prim/mapList))
 (defn lookup [_Gamma a]
   (or (and (= '_? a) [a (Forall. #{} (Var. (gensym 'a)))])
       (if-let [t (get _Gamma a)] [a t])
@@ -47,11 +47,11 @@
 
 (defn instantiate [[as t :as x]]
   (let [vars  (mapv (comp #(Var. %) gensym symhead) as)
-        subst (t/sub (zipmap as vars))]
-    (t/substitute t subst)))
+        subst (base/sub (zipmap as vars))]
+    (base/substitute t subst)))
 
 (defn generalize [env t]
-  (Forall. (set/difference (t/ftv t) (t/ftv env)) t))
+  (Forall. (set/difference (base/ftv t) (base/ftv env)) t))
 
 (defn release [t]
   (if (instance? Predicated t)
@@ -114,7 +114,7 @@
         s  (unify ta tb)
         ps (->> (into pa pb)
                 (remove nil?)
-                (mapcat #(split-pred (t/substitute % s)))
+                (mapcat #(split-pred (base/substitute % s)))
                 (distinct))]
     (every? (partial release? _Gamma) ps)
     [s ps]))
@@ -126,7 +126,7 @@
                 coll)
         s2 (unify/unify-coll (map :t coll'))
         t2 (if (seq coll')
-             (-> coll' first :t (t/substitute s2))
+             (-> coll' first :t (base/substitute s2))
              (Var. (gensym 'a)))]
     [s2 ($ (ctor coll') (Container. tag [t2]))]))
 
@@ -144,7 +144,7 @@
          _Gamma (assoc _Gamma a (Forall. #{} tv))
          [s [_ t :as e]] (e _Gamma)
          [p1 t1] (release t)
-         [p2 t2] (release (t/substitute tv s))]
+         [p2 t2] (release (base/substitute tv s))]
      [s ($ (Lambda. (syn-sym a t2) e)
            (with-pred _Gamma [p1 p2] (Arrow. t2 t1)))]))
 
@@ -153,14 +153,14 @@
   ([_Gamma [Apply e1 e2]]
    (let [tv (Var. (gensym 'ξ))
          [s1 [_ t1 :as e1]] (e1 _Gamma)
-         [s2 [_ t2 :as e2]] (e2 (t/substitute _Gamma s1))
-         [s3 ps] (rel-unify _Gamma (t/substitute t1 s2) (hoist (Arrow. t2 tv)))]
+         [s2 [_ t2 :as e2]] (e2 (base/substitute _Gamma s1))
+         [s3 ps] (rel-unify _Gamma (base/substitute t1 s2) (hoist (Arrow. t2 tv)))]
      [(compose s3 s2 s1)
-      ($ (Apply. e1 e2) (with-pred _Gamma ps (t/substitute tv s3)))]))
+      ($ (Apply. e1 e2) (with-pred _Gamma ps (base/substitute tv s3)))]))
 
   ([_Gamma [Let [x] e1 e2]]
    (let [[s1 [_ t1 :as e1]] (e1 _Gamma)
-         _Gamma (t/substitute _Gamma s1)
+         _Gamma (base/substitute _Gamma s1)
          _Gamma (assoc _Gamma x (generalize _Gamma t1))
          [s2 [_ t2 :as e2]] (e2 _Gamma)]
       [(compose s2 s1) ($ (Let. (syn-sym x t1) e1 e2) t2)]))
@@ -173,7 +173,7 @@
           [s5 p2] (rel-unify _Gamma t2 t3)]
       [(compose s5 s4 s3 s2 s1)
        ($ (If. cond then else)
-          (with-pred _Gamma (concat p1 p2) (t/substitute t2 s5)))]))
+          (with-pred _Gamma (concat p1 p2) (base/substitute t2 s5)))]))
 
   ([_Gamma [Select label rec]]
    (let [t1 (Const. label)
@@ -182,7 +182,7 @@
          rectype (Record. (Row. t1 vtype btype))
          [s1 [_ t2 :as r]] (rec _Gamma)
          s2 (unify rectype t2)]
-     [(compose s2 s1) ($ (Select. label r) (t/substitute vtype s2))]))
+     [(compose s2 s1) ($ (Select. label r) (base/substitute vtype s2))]))
 
   ([_Gamma [Restrict label rec]]
    (let [t1 (Const. label)
@@ -192,7 +192,7 @@
          [s1 [_ t2 :as r]] (rec _Gamma)
          s2 (unify rectype t2)]
      [(compose s2 s1)
-      ($ (Restrict. label r) (Record. (t/substitute btype s2)))]))
+      ($ (Restrict. label r) (Record. (base/substitute btype s2)))]))
 
   ([_Gamma [List xs]]
    (infer-coll _Gamma #(List. %) 'lift.lang/List xs))
@@ -245,12 +245,27 @@
         (throw t)))))
 
 (defn check
-  ([expr] (check @t/type-env expr))
+  ([expr] (check @env expr))
   ([env expr]
    (let [[s ast] ((hylo -infer-ann-err ana/parse expr) env)]
-     (t/substitute ast s))))
+     (base/substitute ast s))))
 
 (defn checks
-  ([expr] (checks @t/type-env expr))
+  ([expr] (checks @env expr))
   ([env expr]
    ((hylo -infer-ann-err ana/parse expr) env)))
+
+(defn pretty-sub
+  ([[f & ftvs] [v & vars]]
+   (if f (assoc (pretty-sub ftvs vars) f v) {}))
+  ([ftvs]
+   (-> (sort ftvs)
+       (pretty-sub (map (comp #(Var. %) symbol str char) (range 97 123)))
+       (base/sub))))
+
+(p/defn prettify-vars
+  ([[Forall as t]]
+   (let [[m :as sub] (pretty-sub (base/ftv t))]
+     (Forall. (set (map (comp :a m) as)) (base/substitute t sub))))
+  ([t]
+   (base/substitute t (pretty-sub (base/ftv t)))))

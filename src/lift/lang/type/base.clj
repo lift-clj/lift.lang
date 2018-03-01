@@ -60,6 +60,8 @@
   Show (-show [_]   (str (string/join " " (map #(str "∀" %) as)) \. t))
   Sub  (-sub  [_ s] (Forall. as (t (apply dissoc s as)))))
 
+(defn forall [as t] (Forall. as t))
+
 (impl/deftype (Predicate tag as)
   Ftv  (-ftv  [_] (apply union as))
   Show (-show [_] (format "%s %s" (name tag) (string/join " " as))))
@@ -134,6 +136,11 @@
 (impl/deftype (Map r)
   Functor (-map [_ f] (Map. (f/-map r f)))
   Show    (-show [_]  r))
+
+(impl/deftype (Set xs)
+  Functor (-map  [_ f] (Set. (set (map f xs))))
+  Ftv     (-ftv  [_]   xs)
+  Show    (-show [_]   (format "#{%s}" (string/join " " xs))))
 
 (impl/deftype (Tuple xs)
   Functor (-map  [_ f] (Tuple. (f/-map xs f)))
@@ -217,11 +224,16 @@
   Show
   (-show [_] (format "S[%s]" s)))
 
+(defn sub [s]
+  (Substitution. s))
+
+(def id (sub {}))
+
 (defn $ [expr type & [err meta]]
   (SyntaxNode. expr type err meta))
 
 (def container-types
-  `[Container RowEmpty Row Record Restrict Select List Vector Map Tuple])
+  `[Container RowEmpty Row Record Restrict Select Set List Vector Map Tuple])
 
 (defmacro import-container-types []
   `(do (import ~@container-types) nil))

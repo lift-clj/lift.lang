@@ -10,6 +10,7 @@
    [lift.f.functor :as f :refer [Functor]]
    [lift.lang.util :as u]
    [lift.lang.type.base :as base]
+   [lift.lang.inference :as infer]
    [lift.lang.type.def :as def]))
 
 (base/import-container-types)
@@ -20,11 +21,7 @@
   (Substitution. s))
 
 (def id (sub {}))
-
-(defn env [e]
-  (Env. e))
-
-(def type-env def/type-env)
+(def env infer/env)
 (def ftv base/ftv)
 (def substitute base/substitute)
 
@@ -39,14 +36,14 @@
    (if (namespace s)
      s
      (or (some->> s (ns-resolve ns) u/->sym)
-         (get-type @type-env (symbol (name (ns-name ns)) (name s)))
-         (find-type @type-env (symbol (name (ns-name ns)) (name s)))
+         (get-type @env (symbol (name (ns-name ns)) (name s)))
+         (find-type @env (symbol (name (ns-name ns)) (name s)))
          (u/ns-qualify s))))
   ([s]
    (resolve-sym *ns* s)))
 
 (defmacro t [x]
-  `(get @type-env '~(u/resolve-sym x)))
+  `(get @env '~(u/resolve-sym x)))
 
 (defn ex-unknown-type [t]
   (throw (ex-info (format "Unknown Type %s" (pr-str t))
@@ -62,3 +59,9 @@
 
 (defmacro def [name sig]
   `(def/intern-signature ~name ~sig))
+
+;; (defn constructor [tag args]
+;;   `(fn ~tag ~args
+;;      (Container. tag )
+;;      )
+;;   )

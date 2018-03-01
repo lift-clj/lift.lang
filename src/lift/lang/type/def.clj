@@ -1,14 +1,15 @@
 (ns lift.lang.type.def
-  (:refer-clojure :exclude [ns-name])
+  (:refer-clojure :exclude [intern ns-name])
   (:require
    [clojure.spec.alpha :as s]
-   [lift.lang.type.base :as base]
-   [lift.lang.util :as u]))
+   [lift.lang.type.base :as base :refer [forall]]
+   [lift.lang.util :as u]
+   [lift.f.functor :as f]
+   [lift.lang.inference :as infer]
+   [lift.lang.unification :as unify]))
 
 (base/import-container-types)
 (base/import-type-types)
-
-(def type-env (atom {}))
 
 (defn find-type [_Gamma tag]
   (some (fn [[k v]] (and (instance? Container k) (= tag (:tag k)) v)) _Gamma))
@@ -30,12 +31,12 @@
      (or (some->> s (try-ns-resolve ns) u/->sym) s)
      (or (some->> s (try-ns-resolve ns) u/->sym)
          (let [s' (symbol (name (ns-name ns)) (name s))]
-           (or (when (get-type @type-env s') s')
-               (when (find-type @type-env s') s')))
+           (or (when (get-type @infer/env s') s')
+               (when (find-type @infer/env s') s')))
          (some->> s (try-ns-resolve 'lift.lang) u/->sym)
          (let [s' (symbol "lift.lang" (name s))]
-           (or (when (get-type @type-env s') s')
-               (when (find-type @type-env s') s')))
+           (or (when (get-type @infer/env s') s')
+               (when (find-type @infer/env s') s')))
          (u/ns-qualify s))))
   ([s]
    (resolve-sym *ns* s)))
@@ -76,6 +77,9 @@
 (s/def ::row
   (s/map-of (s/or :type-var ::type-var :| #{'|} :kw keyword?) ::type))
 
+(s/def ::set
+  (s/coll-of ::type :kind set?))
+
 (s/def ::type
   (s/or :unit          ::unit
         :type-name     ::type-name
@@ -84,7 +88,8 @@
         :arrow         ::arrow-parens
         :parameterized ::parameterized
         :rec-cons      ::rec-cons
-        :row           ::row))
+        :row           ::row
+        :set           ::set))
 
 (s/def ::retype
   (s/alt :unit          ::unit
@@ -94,7 +99,8 @@
          :arrow         ::arrow-parens
          :parameterized ::parameterized
          :rec-cons      ::rec-cons
-         :row           ::row))
+         :row           ::row
+         :set           ::set))
 
 (s/def ::product
   (s/cat :type-cons ::type-cons := #{'=} :value-cons ::parameterized))
@@ -159,6 +165,9 @@
       (update :type-cons construct)
       (assoc :rec-cons (construct [:rec-cons (:rec-cons ast)]))))
 
+(defmethod construct :set [[_ ast]]
+  (Set. (set (map construct ast))))
+
 (defmethod construct :simple-type [[_ type-name]]
   (Container. (resolve-sym type-name) nil))
 
@@ -194,16 +203,16 @@
 
 (defmacro prim [t]
   `(let [t# (Const. '~t)]
-     (swap! type-env assoc '~t t#)
+     (swap! infer/env assoc '~t t#)
      t#))
 
 (defn intern-type-only [type]
-  (swap! type-env assoc type (Forall. (base/ftv type) type))
+  (swap! infer/env assoc type (Forall. (base/ftv type) type))
   type)
 
 (defn intern-type-sig [type sig]
   (let [sigma (Forall. (base/ftv sig) sig)]
-    (swap! type-env assoc type sigma)
+    (swap! infer/env assoc type sigma)
     (base/$ type sigma)))
 
 (defmacro intern-signature
@@ -211,3 +220,33 @@
    `(intern-type-only (type-signature '~type)))
   ([type sig]
    `(intern-type-sig '~(resolve-sym type) (type-signature '~sig))))
+
+(s/def ::def*-decl
+  (s/cat :doc? (s/? string?)
+         :ann? (s/? ::type)
+         :init any?))
+
+(defn untern [name]
+  (swap! infer/env dissoc name))
+
+(defn intern [name value]
+  (swap! infer/env assoc name value)
+  (base/$ name value))
+
+(defn def* [[name & decl]]
+  (let [{:keys [doc? ann? init]} (u/assert-conform ::def*-decl decl)
+        name     (resolve-sym name)
+        ann?     (when ann? (construct ann?))
+        sigma1   (when ann? (forall (base/ftv ann?) ann?))
+        _        (untern name)
+        init'    (u/macroexpand-all init)
+        [s1 syn] (infer/checks init')
+        [e1 t1]  (base/substitute syn s1)
+        sigma2   (forall (base/ftv t1) t1)]
+    (when ann?
+      (unify/unify (infer/instantiate sigma1) (infer/instantiate sigma2)))
+    `(do
+       ~(if doc?
+          `(def ~name ~doc? ~init)
+          `(def ~name ~init))
+       (intern '~name ~(infer/prettify-vars (or sigma1 sigma2))))))

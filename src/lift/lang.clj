@@ -1,5 +1,5 @@
 (ns lift.lang
-  (:refer-clojure :exclude [+ * - / case defn let map name read = not=])
+  (:refer-clojure :exclude [+ * - / case cond defn fn let map name ns read = not=])
   (:require
    [lift.lang.case :as case]
    [lift.lang.defn :as defn]
@@ -8,7 +8,8 @@
    [lift.lang.monad :as monad]
    [lift.lang.prim :as prim]
    [lift.lang.type :as type]
-   [lift.lang.type.data :as data]))
+   [lift.lang.type.data :as data]
+   [lift.lang.namespace :as ns]))
 
 (type/def List      (List a))
 (type/def Vector    (Vector a))
@@ -22,7 +23,7 @@
 (type/def double    (Ratio -> Double))
 (type/def list      (List a))
 (type/def cons      (a -> (List a) -> (List a)))
-(type/def first     ((List a) -> a))
+(type/def first     (List a -> a))
 (type/def vector    (Vector a))
 (type/def conj      (Vector a -> a -> Vector a))
 ;; (type/def map.      {})
@@ -32,6 +33,13 @@
 (type/def keyword   (String -> Keyword))
 (type/def reverse   (List a -> List a))
 ;; (type/def map       ((a -> b) -> (List a) -> (List b)))
+(type/def filter    ((a -> Boolean) -> List a -> List a))
+
+(type/def strcat (String -> String -> String))
+(def strcat str)
+
+(defmacro ns [& ns-form]
+  (ns/ns* ns-form))
 
 (defmacro data
   {:style/indent :defn}
@@ -56,8 +64,22 @@
 (defmacro case [x & pattern-exprs]
   (case/case* x pattern-exprs))
 
+(defmacro cond [& clauses]
+  (when clauses
+    `(if ~(first clauses)
+       ~(if (next clauses)
+          (second clauses)
+          (throw (IllegalArgumentException.
+                  "cond requires an even number of forms")))
+       ~(if-let [more (next (next clauses))]
+          `(cond ~@more)
+          `(type/unmatched-case-error ~'cond)))))
+
 (defmacro defn [name & decl]
   (defn/defn* name decl))
+
+(defmacro fn [& decl]
+  (defn/fn- decl))
 
 (defmacro let [bindings expr]
   (let/destructuring-let bindings expr))
@@ -65,7 +87,6 @@
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)
 (data Either a b = Left a | Right b)
-;; (data Pair a b = Pair a b)
 
 (interface (Eq a)
   (=    (a -> a -> Boolean))
@@ -163,23 +184,32 @@
 (impl (Functor Vector)
   (map [f xs] (prim/mapVector f xs)))
 
-;; (interface (Monad m)
-;;   (return (a -> m a))
-;;   (>>=    (m a -> (a -> m b) -> m b))
-;;   (>>     (m a -> m b -> m b)))
+(interface (Foldable f)
+  (foldl ((a -> b -> c) -> b -> f a -> c)))
 
-;; (impl (Monad Maybe)
-;;   (return
-;;     ([a] (Just a)))
+;; (impl (Foldable List)
+;;   (foldl [f b fa]
+
+;;     )
+;;   )
+
+(interface (Monad m)
+  (return (a -> m a))
+  (>>=    (m a -> (a -> m b) -> m b))
+  (>>     (m a -> m b -> m b)))
+
+(impl (Monad Maybe)
+  (return
+    ([a] (Just a)))
+  (>>=
+    ([(Just x) f] (f x))
+    ([Nothing  _] Nothing)))
+
+;; (impl (Monad (Either e))
+;;   (return ([a] (Right a)))
 ;;   (>>=
-;;     ([(Just x) f] (f x))
-;;     ([Nothing  _] Nothing)))
-
-;; (with-ctor
-;;   (data Email = Email String)
-;;   (String -> Maybe Email)
-;;   (fn [s]
-;;     (if (.contains s "@") (Just (Email s)) Nothing)))
+;;     ([(Right x) f] (f x))
+;;     ([(Left  x) _] (Left x))))
 
 ;; (data State s a = State h)
 

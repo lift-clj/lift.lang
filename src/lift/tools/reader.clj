@@ -130,3 +130,11 @@
                     (char-syntax-marking-push-back-reader mark-at))]
     (binding [r/*data-readers* {'mark (fn [x] (Mark. x))}]
       (r/read r))))
+
+(defn read-namespace [filename]
+  (with-open [r (-> filename java.io.FileReader. rt/indexing-push-back-reader)]
+    (let [form (r/read r false nil)]
+      (if (and (seq? form) (= 'ns (first form)))
+        form
+        (throw
+         (Exception. (str "Namespace not first form in file: " filename)))))))

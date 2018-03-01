@@ -14,7 +14,6 @@
     (or (some-> (get (ns-aliases *ns*) ns-sym) str (symbol (name s))) s)
     (symbol (str (.name *ns*)) (str s))))
 
-
 (defn ->sym [v]
   (if (class? v)
     (symbol (.getSimpleName v))
@@ -31,12 +30,12 @@
   (throw
    (Exception.
     (format
-     "Cannot unify %s and %s"
-     ;; "Cannot unify \n%s : %s and \n%s : %s"
+     ;; "Cannot unify %s and %s"
+     "Cannot unify \n%s : %s and \n%s : %s"
      (pr-str a)
-     ;; [(:tag a) (mapv type (:args a))]
+     [(:tag a) (mapv type (:args a))]
      (pr-str b)
-     ;; [(:tag b) (mapv type (:args b))]
+     [(:tag b) (mapv type (:args b))]
      )
     ;;{:type :unification-failure :a a :b b}
     )))
