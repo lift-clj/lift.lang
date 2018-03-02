@@ -177,6 +177,9 @@
   Show    (-show [_] (format "(if %s %s %s)" cond then else))
   Functor (-map [_ f] (If. (f cond) (f then) (f else))))
 
+(impl/deftype (Quoted x)
+  Show (-show [_] (str \' x)))
+
 (impl/deftype (Prim f t)
   Functor (-map   [x _] x)
   IFn     (invoke [_ x] ((eval f) x))
@@ -235,6 +238,9 @@
 (def container-types
   `[Container RowEmpty Row Record Restrict Select Set List Vector Map Tuple])
 
+(def syntax-types
+  `[Literal Symbol Key Lambda Apply Let If Quoted Prim SyntaxNode Curry Mark])
+
 (defmacro import-container-types []
   `(do (import ~@container-types) nil))
 
@@ -242,7 +248,7 @@
   `(do (import ~@`[Env Substitution]) nil))
 
 (defmacro import-syntax-types []
-  `(do (import ~@`[Literal Symbol Key Lambda Apply Let If Prim SyntaxNode Curry Mark]) nil))
+  `(do (import ~@syntax-types) nil))
 
 (defmacro import-type-types []
   (let [types `[Unit Const Var Vargs Arrow Forall Predicate Predicated New]]

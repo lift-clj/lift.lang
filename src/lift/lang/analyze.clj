@@ -18,7 +18,9 @@
 (base/import-type-types)
 
 (defn class-name? [x]
-  (and (symbol? x) (class? (resolve x))))
+  (try
+    (and (symbol? x) (class? (resolve x)))
+    (catch ClassNotFoundException _)))
 
 (defn mark? [x]
   (instance? Mark x))
@@ -28,7 +30,6 @@
         :Int      integer?
         :Double   double?
         :Float    float?
-        ;; :Num      (s/or :i integer? :d double? :f float?)
         :String   string?
         :Class    class?
         :Symbol   symbol?
@@ -88,6 +89,9 @@
   (s/or :quoted (s/and seq? #(= 'quote (first %)) (comp seq? second))
         :empty  (s/and seq? empty?)))
 
+(s/def ::quoted
+  (s/and seq? #(= 'quote (first %))))
+
 (s/def ::vector vector?)
 
 (s/def ::record
@@ -122,7 +126,8 @@
         :Lst ::list
         :Vec ::vector
         :Rec ::record
-        :Ste ::set))
+        :Ste ::set
+        :Quo ::quoted))
 
 (defn curry [op args]
   (if (seq args)
@@ -209,12 +214,13 @@
 
 (defmethod -parse :Fun [_ f] f)
 
+(defmethod -parse :Quo [_ [_ expr]]
+  (Quoted. expr))
+
 (defn parse [expr]
   (let [conformed (s/conform ::expr expr)]
     (cond (s/invalid? conformed)
-          (if (or (instance? lift.lang.type.impl.Type expr)
-                  (= "lift.lang.type.base.Prim" (.getName (class expr))))
-            ;; TODO: ^^ this is obviously totally broken. WTF?!
+          (if (instance? lift.lang.type.impl.Type expr)
             expr
             (throw (ex-info (format "Invalid Syntax: %s" (pr-str expr))
                             (s/explain-data ::expr expr))))

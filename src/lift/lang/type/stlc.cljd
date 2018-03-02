@@ -1,6 +1,7 @@
 (ns lift.lang.type.stlc
    {:lang :lift/clojure})
 
+(require 'clojure.core)
 ;; (:require
 ;;  [clojure.core :as c]
 ;;  [lift.lang.signatures :as sig])
@@ -33,14 +34,14 @@
 (interface (Show a)
   (show (a -> String)))
 
-(impl (Show Type)
-  (show
-    ([(TCon a)] a)
-    ([(TVar a)] a)
-    ([(TArr a b)]
-     (-> "(" (strcat a) (strcat " -> ") (strcat b) (strcat ")")))
-    ([(TSet a)]
-     (-> "#{" (strcat a) (strcat "}")))))
+;; (impl (Show Type)
+;;   (show
+;;     ([(TCon a)] a)
+;;     ([(TVar a)] a)
+;;     ([(TArr a b)]
+;;      (-> "(" (strcat a) (strcat " -> ") (strcat b) (strcat ")")))
+;;     ([(TSet a)]
+;;      (-> "#{" (strcat a) (strcat "}")))))
 
 (defmacro parse-sig [sig]
   (letfn [(rec [[t e]]

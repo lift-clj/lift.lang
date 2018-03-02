@@ -1,9 +1,12 @@
 (ns lift.lang
-  (:refer-clojure :exclude [+ * - / case cond defn fn let map name ns read = not=])
+  (:refer-clojure
+   :exclude
+   [+ * - / case cond defn fn let map name ns read require = not=])
   (:require
    [lift.lang.case :as case]
-   [lift.lang.defn :as defn]
+   [lift.lang.defn :as defn :refer [special]]
    [lift.lang.interface :as iface]
+   [lift.tools.loader :as loader]
    [lift.lang.let :as let]
    [lift.lang.monad :as monad]
    [lift.lang.prim :as prim]
@@ -38,30 +41,30 @@
 (type/def strcat (String -> String -> String))
 (def strcat str)
 
-(defmacro ns [& ns-form]
+(special ns [& ns-form]
   (ns/ns* ns-form))
 
-(defmacro data
+(special data
   {:style/indent :defn}
   [& decl]
   (data/data* decl))
 
-(defmacro with-ctor
+(special with-ctor
   {:style/indent :defn}
   [data-decl type-sig ctor-fn]
   (data/private-data* type-sig ctor-fn (rest data-decl)))
 
-(defmacro interface
+(special interface
   {:style/indent :defn}
   [type & decl]
   (iface/interface type decl))
 
-(defmacro impl
+(special impl
   {:style/indent [:defn [:defn]]}
   [type & impls]
   (iface/impl type impls))
 
-(defmacro case [x & pattern-exprs]
+(special case [x & pattern-exprs]
   (case/case* x pattern-exprs))
 
 (defmacro cond [& clauses]
@@ -83,6 +86,9 @@
 
 (defmacro let [bindings expr]
   (let/destructuring-let bindings expr))
+
+(defn require [& args]
+  (apply loader/require* args))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)

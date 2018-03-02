@@ -3,6 +3,7 @@
   (:require
    [clojure.core :as c]
    [clojure.spec.alpha :as s]
+   [lift.tools.loader :as loader]
    [lift.lang.case :as case]))
 
 (c/defn vars [n]
@@ -58,3 +59,8 @@
         (fn-pattern (list decl))
         :else
         `(c/fn ~@decl)))
+
+(defmacro special [name & decl]
+  `(do
+     (defmacro ~name ~@decl)
+     (let [v# (resolve '~name)] (swap! loader/specials conj v#) v#)))

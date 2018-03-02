@@ -234,7 +234,6 @@
                      (try
                        (when (not (impl? k))
                          (let [vt (infer/instantiate v)]
-                           ;; (prn k vt)
                            (when (unify/unify t' vt)
                              k)))
                        (catch Throwable _)))))))))

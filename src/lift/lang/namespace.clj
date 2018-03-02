@@ -47,7 +47,8 @@
   (let [{:keys [name docstring attr-map]} (u/assert-conform ::ns-form ns-form)
         prelude (prelude attr-map)
         imports (some-> prelude ns-publics keys)
-        mapped  (set/intersection (set imports) (set (keys (ns-map name))))]
+        mapped  (set/intersection (set imports)
+                                  (set (some-> name c/find-ns ns-map keys)))]
     `(do
        (in-ns '~name)
        (.resetMeta (clojure.lang.Namespace/find '~name)
