@@ -2,6 +2,9 @@
    {:lang :lift/clojure})
 
 (require 'clojure.core)
+(alias 'c 'clojure.core)
+(require 'lift.lang.signatures)
+(alias 'sig 'lift.lang.signatures)
 
 (data Literal
   = LBool      Boolean

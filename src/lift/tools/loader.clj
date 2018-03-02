@@ -37,7 +37,6 @@
             (concat ['try #'defmacro] @specials))))
 
 (defn ignore? [expr]
-  (prn (u/resolve-sym (first expr)))
   (if-let [[op] (when (seq? expr) expr)]
     (and (symbol? op)
          (or (contains? (ignore-syms) op)
@@ -64,7 +63,6 @@
        (rewrite/emit)))
 
 (defn eval [expr]
-  (prn expr)
   (if (seq? expr)
     (let [[op & args] expr]
       (cond (= 'def op)

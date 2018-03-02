@@ -91,6 +91,7 @@
 (defn require [& args]
   (apply loader/require* args))
 (t/def require (Symbol -> ()))
+(t/def alias (Symbol -> Symbol -> ()))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)
