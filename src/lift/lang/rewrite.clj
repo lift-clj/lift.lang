@@ -73,6 +73,7 @@
 (p/defn -emit
   ([[Literal a]] a)
   ([[Symbol a]] a)
+  ([[Quoted x]] (list 'quote x))
   ([[Key k]] k)
   ([[Lambda [Symbol x] e]] `(fn* [~x] ~e))
   ([[Apply e1 e2]] (list e1 e2))

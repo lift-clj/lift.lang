@@ -137,7 +137,9 @@
   ([_Gamma [Literal _ :as expr]] [id ($ expr (ana/type expr))])
 
   ([_Gamma [Symbol a :as expr]]
-   (let [[a t] (lookup _Gamma a)] [id ($ (Symbol. a) (instantiate t))]))
+   (if (-> _Gamma ::quoted true?)
+     [id ($ (Quoted. (Symbol. a)) (Const. 'lift.lang/Symbol))]
+     (let [[a t] (lookup _Gamma a)] [id ($ (Symbol. a) (instantiate t))])))
 
   ([_Gamma [Lambda [a] e]]
    (let [tv (Var. (gensym 'ξ))
@@ -215,17 +217,9 @@
 
   ([_Gamma [Prim f t]] [id (Prim. f (instantiate t))])
 
-  ([_Gamma [SyntaxNode n t e m]]
-   (try
-     (let [[s1 [e1 t1]] (n _Gamma)
-           errs (->> (impl/-vec e1)
-                     (filter #(instance? SyntaxNode %))
-                     (mapcat :e)
-                     (filterv identity))]
-       [s1 (base/$ e1 t1 errs m)])
-     (catch Throwable t
-       (let [err (InferError. (.getMessage t) m)]
-         [id (base/$ err (Var. 'a) [err] m)]))))
+  ([_Gamma [Quoted x]] (x (assoc _Gamma ::quoted true)))
+
+  ([_Gamma [SyntaxNode n t e m]] (n _Gamma))
 
   ([_Gamma [Mark a]] (a _Gamma))
 
@@ -236,24 +230,18 @@
   (letfn [(infer-f [x] (fn [env] (-infer env x)))]
     ((cata infer-f expr) _Gamma)))
 
-(defn -infer-ann-err [x]
-  (fn [env]
-    (try
-      (-infer env x)
-      (catch Throwable t
-        ;; [id (base/$ x (Var. 'err) [(str "Inference failure: " (.getMessage t))])]
-        (throw t)))))
+(defn infer1 [expr] (fn [_Gamma] (-infer _Gamma expr)))
 
 (defn check
   ([expr] (check @env expr))
   ([env expr]
-   (let [[s ast] ((hylo -infer-ann-err ana/parse expr) env)]
+   (let [[s ast] ((hylo infer1 ana/parse expr) env)]
      (base/substitute ast s))))
 
 (defn checks
   ([expr] (checks @env expr))
   ([env expr]
-   ((hylo -infer-ann-err ana/parse expr) env)))
+   ((hylo infer1 ana/parse expr) env)))
 
 (defn pretty-sub
   ([[f & ftvs] [v & vars]]

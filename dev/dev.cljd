@@ -1,0 +1,4 @@
+(ns dev
+  {:lang :lift/clojure})
+
+(require 'lift.lang.type.stlc)

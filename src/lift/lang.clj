@@ -12,7 +12,8 @@
    [lift.lang.prim :as prim]
    [lift.lang.type :as type]
    [lift.lang.type.data :as data]
-   [lift.lang.namespace :as ns]))
+   [lift.lang.namespace :as ns]
+   [lift.lang.type :as t]))
 
 (type/def List      (List a))
 (type/def Vector    (Vector a))
@@ -89,6 +90,7 @@
 
 (defn require [& args]
   (apply loader/require* args))
+(t/def require (Symbol -> ()))
 
 (data Boolean = True | False)
 (data Maybe a = Just a | Nothing)

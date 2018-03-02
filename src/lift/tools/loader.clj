@@ -14,9 +14,9 @@
             [clojure.java.io :as io]
             [clojure.set :as set]))
 
-(def specials (atom #{}))
+(defonce specials (atom #{}))
 
-(def loaded-libs (ref #{}))
+(defonce loaded-libs (ref #{}))
 
 (defn root-resource [lib]
   (str \/
@@ -32,17 +32,16 @@
   (let [i (.lastIndexOf filename ".")]
     (when (pos? i) (subs filename (inc i)))))
 
-(def ignore
-  (set/union #{'try #'defmacro} @specials))
-
-(def ignore-syms
-  (set (map #(if (symbol? %) % (u/->sym %)) ignore)))
+(defn ignore-syms []
+  (set (map #(if (symbol? %) % (u/->sym %))
+            (concat ['try #'defmacro] @specials))))
 
 (defn ignore? [expr]
+  (prn (u/resolve-sym (first expr)))
   (if-let [[op] (when (seq? expr) expr)]
     (and (symbol? op)
-         (or (contains? ignore op)
-             (contains? ignore-syms (u/resolve-sym op))))))
+         (or (contains? (ignore-syms) op)
+             (contains? (ignore-syms) (u/resolve-sym op))))))
 
 (defn type-check-error
   [[msg {:keys [file line column expr] :as x} :as infer-err] top-meta]
@@ -55,7 +54,6 @@
 
 (defn check [expr]
   (let [[s1 [_ _ err :as e1]] (infer/checks expr)]
-    (prn e1)
     (if (seq err)
       (throw (type-check-error (first err) (meta expr)))
       (base/substitute e1 s1))))
@@ -66,19 +64,20 @@
        (rewrite/emit)))
 
 (defn eval [expr]
-  (if (ignore? expr)
-    (c/eval expr)
-    (if (seq? expr)
-      (let [[op & args] expr]
-        (cond (= 'def op)
-              (c/eval (def/def* args))
-              (= 'in-ns op)
-              (c/eval (ns/in-ns* (first args)))
-              (= 'ns op)
-              (c/eval (ns/ns* args))
-              :else
-              (-> expr u/macroexpand-all check rewrite c/eval)))
-      (c/eval expr))))
+  (prn expr)
+  (if (seq? expr)
+    (let [[op & args] expr]
+      (cond (= 'def op)
+            (c/eval (def/def* args))
+            (= 'in-ns op)
+            (c/eval (ns/in-ns* (first args)))
+            (= 'ns op)
+            (c/eval (ns/ns* args))
+            (ignore? expr)
+            (c/eval expr)
+            :else
+            (-> expr u/macroexpand-all check rewrite c/eval)))
+    (c/eval expr)))
 
 (defn load* [reader path]
   (with-open [r (rt/indexing-push-back-reader reader 1 path)]

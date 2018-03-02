@@ -55,7 +55,8 @@
                    ~(cond-> attr-map docstring (assoc :doc docstring)))
        ~(if prelude
           `(do
-             (with-loading-context (refer '~prelude :exclude '~(vec mapped)))
+             (doseq [m# (keys (ns-map '~name))] (ns-unmap '~name m#))
+             (with-loading-context (refer '~prelude))
              (with-loading-context
               (refer 'clojure.core :exclude '~imports)))
           `(with-loading-context (refer 'clojure.core)))

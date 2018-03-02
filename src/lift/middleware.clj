@@ -91,7 +91,7 @@
 (defn check
   ([expr] (check @infer/env expr))
   ([env expr]
-   (let [[s ast] ((impl/hylo infer/-infer-ann-err ana/parse expr) env)]
+   (let [[s ast] ((impl/hylo infer/infer1 ana/parse expr) env)]
      [s (type/substitute ast s)])))
 
 (defn def? [expr]
@@ -105,47 +105,6 @@
     (or line (:line top-meta) 0)
     (or column (:column top-meta) 0)
     (Exception. msg))))
-
-(defn lift [top-level-expr]
-  (try
-    (if (or (not *type-check*)
-            (and (seq? top-level-expr) (ignore? top-level-expr)))
-      (c/eval top-level-expr)
-      (if (def? top-level-expr)
-        (c/eval (def/def* (rest top-level-expr)))
-        (let [code (u/macroexpand-all top-level-expr)
-              [s [_ t err :as expr]] (check code)]
-          (if (seq err)
-            (throw (type-check-error (first err) (meta top-level-expr)))
-            (let [ftvs (base/ftv t)
-                  sub  (sub-pretty-vars ftvs)
-                  ret  (->> expr
-                            (rewrite/rewrite @infer/env s)
-                            (rewrite/emit))
-                  t'   (type/substitute t sub)
-                  ret' (pr-str (c/eval ret))]
-              (base/$ ret' t'))))))
-    (catch Throwable t
-      (throw t))))
-
-(defn lifted-load [file file-path file-name]
-  (with-open [r (-> file
-                    (java.io.StringReader.)
-                    (rt/indexing-push-back-reader 1 file-name))]
-    (loop []
-      (when-let [expr (r/read r false nil)]
-        (lift expr)
-        (recur)))))
-
-(defn load-file-code [file file-path file-name]
-  (apply format
-    "(lift.middleware/lifted-load %s %s %s)"
-    (map (fn [item]
-           (binding [*print-length* nil
-                     *print-level* nil]
-             (pr-str item)))
-         [file file-path file-name])))
-
 
 (defn type-of-symbol [ns expr]
   (when-let [t (and (symbol? expr)
@@ -279,23 +238,6 @@
       (assoc :dialect (or (ns/dialect ns)
                           (-> file-name rdr/read-namespace ns/analyze-dialect))))
     (catch Throwable _ msg)))
-
-;; (defn eval-handler [handler {:keys [op ns file-name expr-pos code] :as msg}]
-;;   (let [lift? (some-> ns symbol find-ns meta :lang (= :lift/clojure))
-;;         [line col] expr-pos
-;;         code' (read-code msg)]
-;;     (if (control? code')
-;;       (handler
-;;        (assoc msg
-;;               :eval (symbol "lift.middleware" (name (::op code')))
-;;               :code [(assoc code' :ns (symbol ns))]))
-;;       (let [eval (case op "eval" `lift "load-file" `c/eval)]
-;;         (if lift?
-          ;; (binding [clojure.tools.nrepl.middleware.load-file/load-file-code load-file-code]
-          ;;     (-> (assoc msg :eval eval :code [code'])
-          ;;      (cond-> (= op "load-file") (dissoc :ns))
-          ;;      (handler)))
-;;           (handler msg))))))
 
 (def dialect-handler nil)
 (defmulti dialect-handler
