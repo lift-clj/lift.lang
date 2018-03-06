@@ -38,6 +38,8 @@
 (type/def reverse   (List a -> List a))
 ;; (type/def map       ((a -> b) -> (List a) -> (List b)))
 (type/def filter    ((a -> Boolean) -> List a -> List a))
+(type/def count     (List a -> Long))
+(type/def comp      ((a -> b) -> (b -> c) -> a -> c))
 
 (type/def strcat (String -> String -> String))
 (def strcat str)
@@ -159,6 +161,9 @@
   (+ (a -> a -> a))
   (* (a -> a -> a))
   (- (a -> a -> a)))
+
+(type/def zero? (Long -> Boolean))
+(type/def dec   (Long -> Long))
 
 (impl (Num Long)
   (+ [x y] (prim/+Long x y))

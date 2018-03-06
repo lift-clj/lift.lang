@@ -14,6 +14,8 @@
             [clojure.java.io :as io]
             [clojure.set :as set]))
 
+(base/import-type-types)
+
 (defonce specials (atom #{}))
 
 (defonce loaded-libs (ref #{}))
@@ -36,26 +38,39 @@
   (set (map #(if (symbol? %) % (u/->sym %))
             (concat ['try #'defmacro] @specials))))
 
-(defn ignore? [expr]
-  (if-let [[op] (when (seq? expr) expr)]
-    (and (symbol? op)
-         (or (contains? (ignore-syms) op)
-             (contains? (ignore-syms) (u/resolve-sym op))))))
+(defn ignore? [op]
+  (and (symbol? op)
+       (or (contains? (ignore-syms) op)
+           (contains? (ignore-syms) (u/resolve-sym op)))))
+
+(defn deepest-expr-meta [e]
+  (letfn [(expr-meta [x]
+            (let [{:keys [file line column] :as d} (ex-data x)]
+              (when (and file line column)
+                d)))]
+    (if-let [cause (.getCause e)]
+      (or (deepest-expr-meta cause)
+          (expr-meta cause))
+      (expr-meta e))))
 
 (defn type-check-error
-  [[msg {:keys [file line column expr] :as x} :as infer-err] top-meta]
-  (throw
-   (clojure.lang.Compiler$CompilerException.
-    (or file (:file top-meta) (pr-str expr))
-    (or line (:line top-meta) 0)
-    (or column (:column top-meta) 0)
-    (Exception. msg))))
+  [e expr]
+  (let [{:keys [line column file]} (deepest-expr-meta e)
+        expr-meta (meta expr)]
+    (clojure.lang.Compiler$CompilerException.
+     (or file (:file expr-meta) (pr-str expr))
+     (or line (:line expr-meta) 0)
+     (or column (:column expr-meta) 0)
+     e)))
 
 (defn check [expr]
-  (let [[s1 [_ _ err :as e1]] (infer/checks expr)]
-    (if (seq err)
-      (throw (type-check-error (first err) (meta expr)))
-      (base/substitute e1 s1))))
+  (try
+    (let [[s1 e1] (infer/checks expr)]
+      (base/substitute e1 s1))
+    (catch clojure.lang.ExceptionInfo e
+      (if (-> e ex-data :type (= ::infer/inference-exception))
+        (type-check-error e expr)
+        (throw e)))))
 
 (defn rewrite [expr]
   (->> expr
@@ -65,16 +80,18 @@
 (defn eval [expr]
   (if (seq? expr)
     (let [[op & args] expr]
-      (cond (= 'def op)
-            (c/eval (def/def* args))
-            (= 'in-ns op)
+      (cond (= 'in-ns op)
             (c/eval (ns/in-ns* (first args)))
             (= 'ns op)
             (c/eval (ns/ns* args))
-            (ignore? expr)
+            (ignore? op)
             (c/eval expr)
             :else
-            (-> expr u/macroexpand-all check rewrite c/eval)))
+            (let [[op & args] (u/macroexpand-all expr)]
+              (cond (= 'def op)
+                    (c/eval (def/def* args))
+                    :else
+                    (-> expr check rewrite c/eval)))))
     (c/eval expr)))
 
 (defn load* [reader path]

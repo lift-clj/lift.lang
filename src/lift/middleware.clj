@@ -33,12 +33,6 @@
 (def ^:dynamic *type-check* true)
 (def ^:dynamic *prn-type* false)
 
-(declare ignore)
-
-(defn ignore? [[op]]
-  (and (symbol? op)
-       (or (contains? ignore op)
-           (contains? ignore (resolve op)))))
 
 (deftype Ret [x t])
 
@@ -203,10 +197,6 @@
       (throw t?)
       (first t?))))
 
-(def ignore
-  #{#'ns 'ns 'try #'type/def #'lift/interface #'lift/impl #'lift/data
-    #'lift/with-ctor #'defmacro #'lifted-load})
-
 (defn run-op [msg]
   (try
     ((ns-resolve 'lift.middleware (::op msg)) msg)
@@ -215,6 +205,7 @@
       (println t))))
 
 (defn read-code [{:keys [op ns file-name expr-pos code] :as msg}]
+  (prn ns file-name expr-pos code)
   (when (seq code)
     (let [[line] expr-pos
           rdr   (some-> code
@@ -222,7 +213,7 @@
                           (str (apply str (repeat (dec line) \newline))))
                         (java.io.StringReader.)
                         (rt/indexing-push-back-reader 1 file-name))]
-      (if (= op "eval") (r/read rdr) code))))
+      (r/read rdr))))
 
 (defn extension [filename]
   (let [i (.lastIndexOf filename ".")]
@@ -246,7 +237,10 @@
 (defmethod dialect-handler :default [handler msg] (handler msg))
 
 (defmethod dialect-handler [:eval :lift/clojure] [handler msg]
-  (handler (assoc msg :eval `loader/eval)))
+  (-> msg
+      (assoc :eval `loader/eval
+             :code (vector (read-code msg)))
+      (handler)))
 
 (defmethod dialect-handler [:load-file :lift/clojure] [handler msg]
   (binding [load-file/load-file-code loader/load-file-code]

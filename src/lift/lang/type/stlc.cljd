@@ -1,5 +1,5 @@
 (ns lift.lang.type.stlc
-   {:lang :lift/clojure})
+  {:lang :lift/clojure})
 
 (require 'clojure.core)
 (alias 'c 'clojure.core)
@@ -28,6 +28,47 @@
   | TSet Type)
 
 (data Subst = Subst (List (Pair TVar Type)))
+
+(interface  (Corecursive t)
+  (embed (f t -> t)))
+
+;; (def ana
+;;   (Corecursive f t => (a -> f a) -> a -> t)
+;;   ;; TODO: ^^ this should work
+;;   (fn [f]
+;;     (comp embed (map (ana f)) f)))
+
+;; (defn ana [f x]
+;;   (map #(ana f %) (f x)))
+;; ana g = a'
+;; where a' x = embed . map a' . g $ x
+
+(def fix
+  ((Lazy a -> a) -> a)
+  (fn [f] (f (fix f))))
+
+;; (def fix
+;;   ((Lazy a -> a) -> a)
+;;   (fn [f] (let [x (f x)] x)))
+
+;; (def fib
+;;   (fix (fn [f]
+;;          (fn [n]
+;;            (if (zero? n)
+;;              0
+;;              (if (= n 1)
+;;                1
+;;                (+ (f (dec n))
+;;                   (f (- n 2)))))))))
+
+;; (data Fix f = Fx (f Fix f))
+
+
+;; (defn cata [f x]
+;;   (f (f/map #(cata f %) x)))
+
+;; (defn hylo [f g x]
+;;   (f (f/-map (g x) #(hylo f g %))))
 
 (def id (Subst ()))
 
@@ -60,13 +101,21 @@
 ;; (defn infinite-type-error [a t]
 ;;   (Left (-> "Infinite type" (strcat (show a)) (strcat (show t)))))
 
-;; (def elem
-;;   (List a -> a -> Boolean)
-;;   (fn [alist x]
-;;     (first (filter (fn [k] (= k x)) alist))))
+(def elem
+  (List a -> a -> Boolean)
+  (fn [alist x]
+    (let [xs (filter (fn [k] (= k x)) alist)]
+      (if (pos? (count xs))
+        True
+        False))))
+
+(def should-this-type-check?
+  (List a -> a -> Boolean)
+  (fn [alist x]
+    (first (filter (fn [k] (= k x)) alist))))
 
 ;; clojure.tools.namespace.repl
-;; (elem '(1 2 3) 1)
+(elem '(1 2 3) 2)
 
 ;; (defn occurs? [x expr]
 ;;   (ftv expr)

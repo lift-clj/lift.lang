@@ -35,14 +35,27 @@
 ;; Functor f, (Functor f), Either (Maybe a) b
 (s/def ::type-app
   (s/cat :op   (s/or :var ::var :type-name ::type-name)
-         :args (s/+ (s/& ::simple-expr))))
+         :args (s/+ (s/or :var       ::var
+                          :type-name ::type-name
+                          :type-app  (s/and seq? ::type-app)
+                          :tuple     ::tuple
+                          :arrow     (s/and seq? ::arrow)
+                          :set       ::set))))
 
 (s/def ::tuple
-  (s/and vector? (s/+ ::type-expr)))
+  (s/and vector? (s/+ (s/or :var       ::var
+                            :type-name ::type-name
+                            :type-app  (s/and seq? ::type-app)
+                            :tuple     ::tuple
+                            :arrow     (s/and seq? ::arrow)
+                            :set       ::set))))
 
 ;; a -> (a -> b) -> c... -> b, Functor f -> f a
 (s/def ::arrow
   (s/cat :a ::type-expr :-> #{'->} :b ::retype-expr))
+
+(s/def ::pred
+  (s/cat :pred ::type-app :=> #{'=>} :expr ::retype-expr))
 
 (s/def ::set
   (s/and set? (s/cat :a ::type-expr)))
@@ -62,7 +75,8 @@
          :type-app  ::type-app
          :tuple     ::tuple
          :arrow     (s/and seq? ::arrow)
-         :set       ::set))
+         :set       ::set
+         :pred      ::pred))
 
 (s/def ::retype-expr
   (s/alt :var       ::var
@@ -71,7 +85,8 @@
          :type-app  ::type-app
          :tuple     ::tuple
          :arrow     ::arrow
-         :set       ::set))
+         :set       ::set
+         :pred      ::pred))
 
 ;; x.y/z
 (s/def ::name symbol?)
@@ -100,7 +115,13 @@
     :type-name (Const. x)
     :type-app  (Container. (parse-type-expr (:op x)) (mapv parse-type-expr (:args x)))
     :tuple     (Tuple. (mapv parse-type-expr x))
-    :arrow     (Arrow. (parse-type-expr (:a x)) (parse-type-expr (:b x)))))
+    :set       (Container. (Const. 'Set) [(parse-type-expr (:a x))])
+    :arrow     (Arrow. (parse-type-expr (:a x)) (parse-type-expr (:b x)))
+    :pred      (let [{:keys [pred expr]} x]
+                 (Predicated.
+                  [(Predicate. (second (:op pred))
+                               (mapv parse-type-expr (:args pred)))]
+                  (parse-type-expr expr)))))
 
 (defn parse [texpr]
   (let [c (s/conform ::signature texpr)]
@@ -112,6 +133,9 @@
 
 (defn parse-tsig [sig]
   (u/assert-conform ::type-expr sig))
+
+(defn type-signature [expr]
+  (parse-type-expr (parse-tsig expr)))
 
 (defn parse-fn-list-default [expr]
   (let [c (s/conform ::interface-fn-list-default expr)]
@@ -130,17 +154,6 @@
                               #(update % :sig parse-type-expr)))
                    (into {}))
               (-> c :default :impls)))))
-
-(comment
-  (parse-fn-list-default
-  '(
-    (=    ([a & a] -> Boolean))
-    (not= ([a & a] -> Boolean))
-    (default
-     (=    [x & xs] (apply c/= x xs))
-     (not= [x & xs] (apply c/not= x xs)))))
-
-  )
 
 (p/defn curried-arglist
   ([[Arrow a b]]
@@ -166,58 +179,7 @@
   (or (try (tuple-arglist t) (catch Throwable _))
       (curried-arglist t)))
 
-(defn q1 [x] (list 'quote x))
-
 (defn arrseq [f]
   (if (instance? Arrow f)
     (cons (:a f) (arrseq (:b f)))
     ()))
-
-(defn check-lambda [_Gamma bindings types e]
-  (let [types' (map (fn [a] (Forall. (base/ftv a) a)) types)
-        _Gamma (apply assoc _Gamma (interleave bindings types'))
-        [s [_ t :as e]] (infer/checks _Gamma e)
-        [p1 t1] (infer/release t)
-        pts (map #(infer/release (type/substitute % s)) (reverse types))
-        ps  (cons p1 (map first pts))
-        t2  (reduce #(Arrow. %2 %) t1 (map second pts))
-        e2  (reduce #(Lambda. (Symbol. %2) %) e bindings)]
-    [s (base/$ e2 (infer/with-pred _Gamma ps t2))]))
-
-(defn check-impl [pred sub f code]
-  (let [f        (u/resolve-sym f)
-        _Gamma        (assoc @type/env pred ::temp)
-        code     (u/macroexpand-all code)
-        [s1 syn] (infer/checks _Gamma code)
-        [e t]    (type/substitute syn s1)
-        [as pt]  (get _Gamma f)
-        _        (assert pt (format "Symbol %s not found in env" f))
-        [ps t']  pt
-        _        (assert t')
-        sigma    (infer/instantiate (Forall. as (type/substitute t' sub)))
-        [s p]    (rel-unify _Gamma t sigma)
-        [_ t]    (infer/release t)]
-    (type/substitute (base/$ e t) s)))
-
-(defn default-impl [pred sub {:keys [f arglist expr]}]
-  (check-impl pred sub f (list 'fn arglist expr)))
-
-(defn match-impl [pred sub {:keys [f impls]}]
-  (let [n    (count (:arglist (first impls)))
-        vs   (defn/vars n)
-        code `(fn [~@vs]
-                   ~(case/case*
-                     (case/tuple n vs)
-                     (mapcat (fn [{:keys [arglist expr]}]
-                               `[~(case/tuple n arglist) ~expr])
-                             impls)))]
-    (check-impl pred sub f code)))
-
-(defn impl [pred sub impls]
-  (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)
-                                      :match   (s/coll-of ::match-impl))
-                                impls)
-        f     (case t
-                :default (partial default-impl pred sub)
-                :match   (partial match-impl pred sub))]
-    (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))

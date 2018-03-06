@@ -203,16 +203,16 @@
 
 (defmacro prim [t]
   `(let [t# (Const. '~t)]
-     (swap! infer/env assoc '~t t#)
+     (infer/intern '~t t#)
      t#))
 
 (defn intern-type-only [type]
-  (swap! infer/env assoc type (Forall. (base/ftv type) type))
+  (infer/intern type (Forall. (base/ftv type) type))
   type)
 
 (defn intern-type-sig [type sig]
   (let [sigma (Forall. (base/ftv sig) sig)]
-    (swap! infer/env assoc type sigma)
+    (infer/intern type sigma)
     (base/$ type sigma)))
 
 (defmacro intern-signature
@@ -226,21 +226,16 @@
          :ann? (s/? ::type)
          :init any?))
 
-(defn untern [name]
-  (swap! infer/env dissoc name))
-
-(defn intern [name value]
-  (swap! infer/env assoc name value)
-  (base/$ name value))
-
 (defn def* [[name & decl]]
+  (prn 'here)
   (let [{:keys [doc? ann? init]} (u/assert-conform ::def*-decl decl)
         name     (resolve-sym name)
         ann?     (when ann? (construct ann?))
         sigma1   (when ann? (forall (base/ftv ann?) ann?))
-        _        (untern name)
+        _        (infer/untern name)
         init'    (u/macroexpand-all init)
-        [s1 syn] (infer/checks init')
+        _Gamma        (assoc @infer/env name (Forall. #{} (Var. 'a)))
+        [s1 syn] (infer/checks _Gamma init')
         [e1 t1]  (base/substitute syn s1)
         sigma2   (forall (base/ftv t1) t1)]
     (when ann?
@@ -249,4 +244,4 @@
        ~(if doc?
           `(def ~name ~doc? ~init)
           `(def ~name ~init))
-       (intern '~name ~(infer/prettify-vars (or sigma1 sigma2))))))
+       (infer/intern '~name ~(infer/prettify-vars (or sigma1 sigma2))))))

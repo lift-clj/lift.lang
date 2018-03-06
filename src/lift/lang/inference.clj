@@ -1,4 +1,5 @@
 (ns lift.lang.inference
+  (:refer-clojure :exclude [intern resolve])
   (:require
    [lift.f.functor :as f]
    [lift.lang.pattern :as p]
@@ -12,7 +13,22 @@
   (:import
    [clojure.lang Fn]))
 
-(def env (atom {}))
+(defonce env (ref {}))
+
+(defn intern [name type]
+  (dosync (alter env assoc name type))
+  ($ name type))
+
+(defn untern [name]
+  (dosync (alter env dissoc name))
+  nil)
+
+(defn resolve
+  ([name]
+   (resolve @env name))
+  ([_Gamma name]
+   (or (if-let [t (get _Gamma name)] [name t])
+       (let [name' (u/resolve-sym name)] (if-let [t (get _Gamma name')] [name' t])))))
 
 (base/import-container-types)
 (base/import-type-types)
@@ -75,6 +91,9 @@
 (p/defn concrete-instance
   ([[Predicate tag as]]
    (Predicate. tag (mapv concrete-instance as)))
+  ([[Container [Var tag] args]]
+   ;; TODO: this is a hack, Var shouldn't be here (or should it?)
+   (Const. (symbol (namespace tag) (name tag))))
   ([[Container tag args]]
    (Const. (symbol (namespace tag) (name tag))))
   ([[Const _ :as c]] c)
@@ -132,6 +151,13 @@
 
 (defn syn-sym [x t]
   ($ (Symbol. x) t [] (assoc (meta x) :expr x)))
+
+(defn type-check-error
+  [{:keys [file line column expr] :as x} throwable]
+  (let [msg (some-> throwable .getMessage)]
+    (ex-info (format "Inference Exception: %s" (or msg ""))
+             (assoc x :type ::inference-exception)
+             throwable)))
 
 (p/defn -infer
   ([_Gamma [Literal _ :as expr]] [id ($ expr (ana/type expr))])
@@ -219,7 +245,14 @@
 
   ([_Gamma [Quoted x]] (x (assoc _Gamma ::quoted true)))
 
-  ([_Gamma [SyntaxNode n t e m]] (n _Gamma))
+  ([_Gamma [SyntaxNode n t e m]]
+   (try
+     (n _Gamma)
+     (catch clojure.lang.ExceptionInfo e
+       (let [d (ex-data e)]
+         (throw (type-check-error m e))))
+     (catch Throwable t
+       (throw (type-check-error m t)))))
 
   ([_Gamma [Mark a]] (a _Gamma))
 

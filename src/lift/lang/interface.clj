@@ -11,7 +11,10 @@
    [lift.lang.analyze :as ana]
    [lift.lang.rewrite :as rewrite]
    [lift.lang.inference :as infer]
-   [lift.lang.type.def :as def]))
+   [lift.lang.type.def :as def]
+   [lift.lang.defn :as defn]
+   [lift.lang.case :as case]
+   [clojure.spec.alpha :as s]))
 
 (base/import-syntax-types)
 (base/import-type-types)
@@ -67,9 +70,8 @@
          (apply impl# (apply concat ~args))))))
 
 (defn type-sig-impl [f sig pred]
-  `(swap! type/env assoc
-          '~(u/resolve-sym f)
-          (Forall. (type/ftv ~sig) (Predicated. [~pred] ~sig))))
+  `(infer/intern '~(u/resolve-sym f)
+                 (Forall. (type/ftv ~sig) (Predicated. [~pred] ~sig))))
 
 (defn interface
   {:style/indent :defn}
@@ -84,7 +86,7 @@
             `[~(default-impl f sig pred t impl)
               ~(type-sig-impl f sig pred)])
           fns)
-       (swap! type/env assoc '~class ~pred)
+       (infer/intern '~class ~pred)
        '~t)))
 
 (def clojure-imports
@@ -104,6 +106,46 @@
           :else
           (def/resolve-sym a))))
 
+(defn check-impl [pred sub f code]
+  (let [f        (u/resolve-sym f)
+        _Gamma        (assoc @type/env pred ::temp)
+        code     (u/macroexpand-all code)
+        [s1 syn] (infer/checks _Gamma code)
+        [e t]    (type/substitute syn s1)
+        [as pt]  (get _Gamma f)
+        _        (assert pt (format "Symbol %s not found in env" f))
+        [ps t']  pt
+        _        (assert t')
+        sigma    (infer/instantiate (Forall. as (type/substitute t' sub)))
+        [s p]    (infer/rel-unify _Gamma t sigma)
+        [_ t]    (infer/release t)]
+    (type/substitute (base/$ e t) s)))
+
+(defn default-impl [pred sub {:keys [f arglist expr]}]
+  (check-impl pred sub f (list 'fn arglist expr)))
+
+(defn match-impl [pred sub {:keys [f impls]}]
+  (let [n    (count (:arglist (first impls)))
+        vs   (defn/vars n)
+        code `(fn [~@vs]
+                   ~(case/case*
+                     (case/tuple n vs)
+                     (mapcat (fn [{:keys [arglist expr]}]
+                               `[~(case/tuple n arglist) ~expr])
+                             impls)))]
+    (check-impl pred sub f code)))
+
+(defn q1 [x] (list 'quote x))
+
+(defn impl-dict [pred sub impls]
+  (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)
+                                      :match   (s/coll-of ::match-impl))
+                                impls)
+        f     (case t
+                :default (partial default-impl pred sub)
+                :match   (partial match-impl pred sub))]
+    (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
+
 (defn impl [[tag & as] impls]
   (let [as     (map resolve-type-param as)
         consts (mapv #(Const. %) as)
@@ -113,5 +155,5 @@
         pred   (Predicate. tag consts)
         sub    (->> (map (fn [a [b]] [b a]) tag-ts bs) (into {}) type/sub)]
     `(do
-       (swap! type/env assoc ~pred ~(sig/impl pred sub impls))
+       (infer/intern ~pred ~(impl-dict pred sub impls))
        '~pred)))

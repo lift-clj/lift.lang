@@ -49,6 +49,7 @@
         imports (some-> prelude ns-publics keys)
         mapped  (set/intersection (set imports)
                                   (set (some-> name c/find-ns ns-map keys)))]
+    (prn imports)
     `(do
        (in-ns '~name)
        (.resetMeta (clojure.lang.Namespace/find '~name)
