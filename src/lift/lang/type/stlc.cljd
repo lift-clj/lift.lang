@@ -32,11 +32,11 @@
 (interface  (Corecursive t)
   (embed (f t -> t)))
 
-;; (def ana
-;;   (Corecursive f t => (a -> f a) -> a -> t)
-;;   ;; TODO: ^^ this should work
-;;   (fn [f]
-;;     (comp embed (map (ana f)) f)))
+(def ana
+  (Corecursive f t => (a -> f a) -> a -> t)
+  ;; TODO: ^^ this should work
+  (fn [f]
+    (comp embed (map (ana f)) f)))
 
 ;; (defn ana [f x]
 ;;   (map #(ana f %) (f x)))
