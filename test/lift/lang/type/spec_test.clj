@@ -57,6 +57,11 @@
 
 (deftest list-test
   (is (= (ts '(Boolean)) (ctr (Const. 'List) (Const. 'Boolean))))
+  (is (= (ts '(a -> b)) (a-> (Var. 'a) (Var. 'b))))
+  (is (= (ts '((a -> b))) (ctr (Const. 'List) (a-> (Var. 'a) (Var. 'b)))))
+  (is (= (ts '((a -> b) -> c)) (a-> (a-> (Var. 'a) (Var. 'b)) (Var. 'c))))
+  (is (= (ts '(((a -> b) -> c)))
+         (ctr (Const. 'List) (a-> (a-> (Var. 'a) (Var. 'b)) (Var. 'c)))))
   (is (= (ts '(a)) (ctr (Const. 'List) (Var. 'a)))))
 
 (deftest vector-test
