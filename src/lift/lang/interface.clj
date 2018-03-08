@@ -121,7 +121,7 @@
         [_ t]    (infer/release t)]
     (type/substitute (base/$ e t) s)))
 
-(defn default-impl [pred sub {:keys [f arglist expr]}]
+(defn non-match-impl [pred sub {:keys [f arglist expr]}]
   (check-impl pred sub f (list 'fn arglist expr)))
 
 (defn match-impl [pred sub {:keys [f impls]}]
@@ -138,11 +138,11 @@
 (defn q1 [x] (list 'quote x))
 
 (defn impl-dict [pred sub impls]
-  (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::default-impl)
-                                      :match   (s/coll-of ::match-impl))
+  (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::sig/default-impl)
+                                      :match   (s/coll-of ::sig/match-impl))
                                 impls)
         f     (case t
-                :default (partial default-impl pred sub)
+                :default (partial non-match-impl pred sub)
                 :match   (partial match-impl pred sub))]
     (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
 
