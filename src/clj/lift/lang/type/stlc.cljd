@@ -1,0 +1,148 @@
+(ns lift.lang.type.stlc
+  {:lang :lift/clojure})
+
+(require 'clojure.core)
+(alias 'c 'clojure.core)
+(require 'lift.lang.signatures)
+(alias 'sig 'lift.lang.signatures)
+
+(data Literal
+  = LBool      Boolean
+  | LLong      Long
+  | LDouble    Double
+  | LString    String
+  | LCharacter Character
+  | LKeyword   Keyword)
+
+(data Expr
+  = Lit Literal
+  | Var String
+  | Lam Var Expr
+  | App Expr Expr
+  | Let Var Expr Expr)
+
+(data Type
+  = TCon String
+  | TVar String
+  | TArr Type Type
+  | TSet Type)
+
+(data Subst = Subst (List (Pair TVar Type)))
+
+(interface  (Corecursive t)
+  (embed (f t -> t)))
+
+(def ana
+  (Corecursive f t => (a -> f a) -> a -> t)
+  ;; TODO: ^^ this should work
+  (fn [f]
+    (comp embed (map (ana f)) f)))
+
+;; (defn ana [f x]
+;;   (map #(ana f %) (f x)))
+;; ana g = a'
+;; where a' x = embed . map a' . g $ x
+
+(def fix
+  ((Lazy a -> a) -> a)
+  (fn [f] (f (fix f))))
+
+;; (def fix
+;;   ((Lazy a -> a) -> a)
+;;   (fn [f] (let [x (f x)] x)))
+
+;; (def fib
+;;   (fix (fn [f]
+;;          (fn [n]
+;;            (if (zero? n)
+;;              0
+;;              (if (= n 1)
+;;                1
+;;                (+ (f (dec n))
+;;                   (f (- n 2)))))))))
+
+;; (data Fix f = Fx (f Fix f))
+
+
+;; (defn cata [f x]
+;;   (f (f/map #(cata f %) x)))
+
+;; (defn hylo [f g x]
+;;   (f (f/-map (g x) #(hylo f g %))))
+
+(def id (Subst ()))
+
+(interface (Show a)
+  (show (a -> String)))
+
+;; (impl (Show Type)
+;;   (show
+;;     ([(TCon a)] a)
+;;     ([(TVar a)] a)
+;;     ([(TArr a b)]
+;;      (-> "(" (strcat a) (strcat " -> ") (strcat b) (strcat ")")))
+;;     ([(TSet a)]
+;;      (-> "#{" (strcat a) (strcat "}")))))
+
+(defmacro parse-sig [sig]
+  (letfn [(rec [[t e]]
+            (c/case t
+              :type-name (list 'TCon (c/name e))
+              :var       (list 'TVar (c/name e))
+              :arrow     (list 'TArr (rec (:a e)) (rec (:b e)))
+              :set       (list 'TSet (rec (:a e)))))]
+    (rec (sig/parse-tsig (list sig)))))
+
+;; (show (parse-sig (a -> b)))
+
+;; (defn constant-unification-error [a b]
+;;   (Left (-> "Cannot unify constant types" (strcat (show a)) (strcat (show b)))))
+
+;; (defn infinite-type-error [a t]
+;;   (Left (-> "Infinite type" (strcat (show a)) (strcat (show t)))))
+
+(def elem
+  (List a -> a -> Boolean)
+  (fn [alist x]
+    (let [xs (filter (fn [k] (= k x)) alist)]
+      (if (pos? (count xs))
+        True
+        False))))
+
+(def should-this-type-check?
+  (List a -> a -> Boolean)
+  (fn [alist x]
+    (first (filter (fn [k] (= k x)) alist))))
+
+;; clojure.tools.namespace.repl
+(elem '(1 2 3) 2)
+
+;; (defn occurs? [x expr]
+;;   (ftv expr)
+;;   )
+
+;; (defn bind [a t]
+;;   (cond (= (TVar a) t) id
+;;         (occurs? a  t) (infinite-type-error a t)
+;;         :else b
+;;         )
+;;   )
+
+
+;; (defn unify
+;;   ([(TCon a) (TCon b)] (if (= a b) (Right id) (Left "Cannot uni")))
+;;   ([(TVar a) (TCon b)] (= a b))
+;;   )
+
+;; ;; (LLong 1)
+
+;; ;; (interface (Substitutable a)
+;; ;;   (ftv (a -> #{Symbol})))
+
+;; ;; ;; (impl (Substitutable Type)
+;; ;; ;;   (ftv
+;; ;; ;;     [(TCon _  )] []
+;; ;; ;;     [(TVar a  )] [a]
+;; ;; ;;     [(TArr a b)] (into (ftv a) (ftv b))
+;; ;; ;;     )
+;; ;; ;;   )
