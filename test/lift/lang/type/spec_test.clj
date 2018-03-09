@@ -18,6 +18,9 @@
 (defn prcd1 [pred type]
   (Predicated. [pred] type))
 
+(defn prcd2 [pred1 pred2 type]
+  (Predicated. [pred1 pred2] type))
+
 (defn pred [tag & args]
   (Predicate. tag (vec args)))
 
@@ -53,6 +56,12 @@
          (prcd1 (pred 'Corecursive (Var. 'f) (Var. 't))
                 (a-> (a-> (Var. 'a) (ctr (Var. 'f) (Var. 'a)))
                      (Var. 'a)
+                     (Var. 't)))))
+  (is (= (ts '([(Corecursive f t) (Base a f)] => (a -> f a) -> a -> t))
+         (prcd2 (pred 'Corecursive (Var. 'f) (Var. 't))
+                (pred 'Base (Var. 'a) (Var. 'f))
+                (a-> (a-> (Var. 'a) (ctr (Var. 'f) (Var. 'a)))
+                     (Var. 'a)
                      (Var. 't))))))
 
 (deftest list-test
@@ -60,6 +69,9 @@
   (is (= (ts '(a -> b)) (a-> (Var. 'a) (Var. 'b))))
   (is (= (ts '((a -> b))) (ctr (Const. 'List) (a-> (Var. 'a) (Var. 'b)))))
   (is (= (ts '((a -> b) -> c)) (a-> (a-> (Var. 'a) (Var. 'b)) (Var. 'c))))
+  (is (= (ts '(a -> (b -> c))) (a-> (Var. 'a) (Var. 'b) (Var. 'c))))
+  (is (= (ts '(a -> ((b -> c))))
+         (a-> (Var. 'a) (ctr (Const. 'List) (a-> (Var. 'b) (Var. 'c))))))
   (is (= (ts '(((a -> b) -> c)))
          (ctr (Const. 'List) (a-> (a-> (Var. 'a) (Var. 'b)) (Var. 'c)))))
   (is (= (ts '(a)) (ctr (Const. 'List) (Var. 'a)))))
@@ -69,9 +81,12 @@
   (is (= (ts '[a]) (ctr (Const. 'Vector) (Var. 'a)))))
 
 (deftest tuple-test
-  (is (= (ts '[Long String]) (Tuple. [(Const. 'Long) (Const. 'String)])))
-  (is (= (ts '[Long b]) (Tuple. [(Const. 'Long) (Var. 'b)])))
-  (is (= (ts '[a b]) (Tuple. [(Var. 'a) (Var. 'b)]))))
+  (is (= (ts '[Long String])
+         (Container. (Const. 'Tuple) [(Const. 'Long) (Const. 'String)])))
+  (is (= (ts '[Long b])
+         (Container. (Const. 'Tuple) [(Const. 'Long) (Var. 'b)])))
+  (is (= (ts '[a b])
+         (Container. (Const. 'Tuple) [(Var. 'a) (Var. 'b)]))))
 
 (deftest set-test
   (is (= (ts '#{Long}) (ctr (Const. 'Set) (Const. 'Long))))

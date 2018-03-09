@@ -7,6 +7,9 @@
                  [org.clojure/data.xml "0.0.8"]
                  [riddley "0.1.14"]
                  [lift/f "0.1.0"]]
+  :source-paths ["src/clj"]
+  :java-source-paths ["src/java"]
+  :prep-tasks ["javac" "compile"]
   :profiles
   {:dev
    {:source-paths ["dev"]
