@@ -9,7 +9,6 @@
                  [lift/f "0.1.0"]]
   :source-paths ["src/clj"]
   :java-source-paths ["src/java"]
-  :prep-tasks ["javac" "compile"]
   :profiles
   {:dev
    {:source-paths ["dev"]
