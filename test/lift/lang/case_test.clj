@@ -139,9 +139,23 @@
                   [Nothing   Nothing] true
                   [_         _      ] false)))))
   (is (= true
-         (eval (case/case*
-                '[(Just 1) (Just 1)]
-                '([(Just x) (Just y)] (= x y)
-                  [Nothing   Nothing] True
-                  [_         _      ] False)))))
+         (case/pcase [(Just 1) (Just 1)]
+           [(Just x) (Just y)] (= x y)
+           [Nothing   Nothing] True
+           [_         _      ] False)))
+
+  (is (false? (case/pcase [(Just 1) Nothing]
+                [(Just x) (Just y)] (= x y)
+                [Nothing   Nothing] true
+                [_         _      ] false)))
+
+  (is (false? (case/pcase [Nothing (Just 1)]
+                [(Just x) (Just y)] (= x y)
+                [Nothing   Nothing] true
+                [_         _      ] false)))
+
+  (is (true? (case/pcase [Nothing Nothing]
+               [(Just x) (Just y)] (= x y)
+               [Nothing   Nothing] true
+               [_         _      ] false)))
   )
