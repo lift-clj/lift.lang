@@ -3,7 +3,9 @@
   (:require
    [lift.lang.type.data :refer [data]]
    [lift.lang.type :as t]
-   [clojure.spec.alpha :as s]))
+   [clojure.spec.alpha :as s])
+  (:import
+   [lift.lang Instance]))
 
 (data Tuple1 a = Tuple1 a)
 (data Tuple2 a b = Tuple2 a b)
@@ -22,7 +24,7 @@
   ([n vars] `(~(nth tpl (dec n)) ~@vars)))
 
 (defn tuple-prjs [n]
-  (-> tpl (nth (dec n)) resolve meta :prj :fs))
+  (-> tpl (nth (dec n)) resolve meta :prjs))
 
 (s/def ::ctor (s/and symbol? #(re-matches #"^[A-Z].*$" (name %))))
 (s/def ::var  (s/and simple-symbol? #(re-matches #"^[^A-Z].*$" (name %))))
@@ -35,6 +37,9 @@
 
 (defn gsym [& _]
   (gensym '_))
+
+(defn tagged? [x tag]
+  (and (instance? Instance x) (.isa x tag)))
 
 (declare case-tree)
 
@@ -96,9 +101,9 @@
 
 (defn irrefutable? [{:keys [type then else expr]}]
   (cond (= type :bind)
-        (if expr true (recur then))
+        (if (some? expr) true (recur then))
         (= type :ltrl)
-        (if expr true (recur else))))
+        (if (some? expr) true (recur else))))
 
 (defn default-case [{:keys [type then else] :as n} default]
   (when n
@@ -111,25 +116,31 @@
             (if (and (not= :bind type) default)
               (assoc n' :else default)
               n')))
-        (if  default
+        (if default
           (update n :else default-case default)
           n)))))
 
 (defmulti emit-case :type)
 
 (defmethod emit-case :dest [{:keys [test thex prjs then else]}]
-  (if-let [{:keys [isa? fs]} (-> test resolve meta :prj)]
-    `(if (~@isa? ~thex)
-       (let* [~@(mapcat (fn [gs p] [gs `(~p ~thex)]) prjs fs)]
-         ~(emit-case then))
-       ~(emit-case else))
-    (throw (ex-info "Could not resolve constructor for destructure"
-                    {:type ::unresolved-type-destructure
-                     :ctor test}))))
+  (try
+    (let [tag (t/resolve-sym test)]
+      `(if (tagged? ~thex '~tag)
+         (let* [~@(->> prjs
+                       (map-indexed (fn [i gs]
+                                      (let [p (Instance/getProjection tag i)]
+                                        [gs `(~p ~thex)])))
+                       (apply concat))]
+           ~(emit-case then))
+         ~(emit-case else)))
+    (catch NullPointerException _
+      (throw (ex-info "Could not resolve constructor for destructure"
+                      {:type ::unresolved-type-destructure
+                       :ctor test})))))
 
 (defmethod emit-case :bind [{:keys [bind thex then expr]}]
   `(let* [~@(mapcat (juxt identity (constantly thex)) bind)]
-     ~(if expr expr (emit-case then))))
+     ~(if (some? expr) expr (emit-case then))))
 
 (defmethod emit-case :ltrl [{:keys [ltrl thex then expr else]}]
   `(if (lift.lang.prim/eq ~ltrl ~thex)

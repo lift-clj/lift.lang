@@ -44,6 +44,8 @@
 (type/def strcat (String -> String -> String))
 (def strcat str)
 
+(type/def case/tagged? (a -> Symbol -> Boolean))
+
 (special ns [& ns-form]
   (ns/ns* ns-form))
 
@@ -115,11 +117,11 @@
 (impl (Eq String)
   (= [x y] (prim/=String x y)))
 
-(impl (Eq Maybe)
-  (=
-    ([(Just x) (Just y)] (= x y))
-    ([Nothing   Nothing] True)
-    ([_         _      ] False)))
+;; (impl (Eq Maybe)
+;;   (=
+;;     ([(Just x) (Just y)] (= x y))
+;;     ([Nothing   Nothing] True)
+;;     ([_         _      ] False)))
 
 ;; (impl (Eq Pair)
 ;;   (=
@@ -187,10 +189,10 @@
 (interface (Functor f)
   (map ((a -> b) -> f a -> f b)))
 
-(impl (Functor Maybe)
-  (map
-    ([f (Just a)] (Just (f a)))
-    ([f  Nothing]  Nothing)))
+;; (impl (Functor Maybe)
+;;   (map
+;;     ([f (Just a)] (Just (f a)))
+;;     ([f  Nothing]  Nothing)))
 
 (impl (Functor List)
   (map [f xs] (prim/mapList f xs)))
@@ -212,12 +214,12 @@
   (>>=    (m a -> (a -> m b) -> m b))
   (>>     (m a -> m b -> m b)))
 
-(impl (Monad Maybe)
-  (return
-    ([a] (Just a)))
-  (>>=
-    ([(Just x) f] (f x))
-    ([Nothing  _] Nothing)))
+;; (impl (Monad Maybe)
+;;   (return
+;;     ([a] (Just a)))
+;;   (>>=
+;;     ([(Just x) f] (f x))
+;;     ([Nothing  _] Nothing)))
 
 ;; (impl (Monad (Either e))
 ;;   (return ([a] (Right a)))

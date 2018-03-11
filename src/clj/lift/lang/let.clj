@@ -10,7 +10,7 @@
   (destructure-bindings (case/tuple-prjs (count bindings)) bindings expr))
 
 (defn dtor-binding [[dtor & bindings] expr]
-  (destructure-bindings (-> dtor resolve meta :prj :fs) bindings expr))
+  (destructure-bindings (-> dtor resolve meta :prjs) bindings expr))
 
 (defn destructuring-let [bindings expr]
   (let [bindings (->> (partition 2 bindings)

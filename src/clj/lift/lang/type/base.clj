@@ -182,8 +182,8 @@
 
 (impl/deftype (Prim f t)
   Functor (-map   [x _] x)
-  IFn     (invoke [_ x] ((eval f) x))
-  Show    (-show  [_]   (name (second f))))
+  IFn     (invoke [_ x] (f x))
+  Show    (-show  [_]   (pr-str f)))
 
 (impl/deftype (SyntaxNode n t e m)
   Functor (-map  [_ f] (SyntaxNode. (f n) t e m))

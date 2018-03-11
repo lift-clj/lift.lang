@@ -1,4 +1,5 @@
 (ns lift.lang.type.data
+  (:refer-clojure :exclude [type])
   (:require
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
@@ -8,55 +9,55 @@
    [lift.lang.type.impl :as impl]
    [lift.lang.pattern :as p]
    [lift.lang.util :as u]
-   [clojure.java.io :as io])
+   [clojure.java.io :as io]
+   [clojure.core :as c])
   (:import
-   [lift.lang Instance]
+   [lift.lang Instance Tagged]
    [lift.lang.type.impl Show]))
 
 (defmethod print-method Instance [x w]
-  (->> (map pr-str (.getElems x))
+  (->> (map pr-str (.-elems x))
        (string/join ", ")
-       (format "(%s %s)" (.getTag x))
+       (format "(%s %s)" (.-tag x))
+       (.write w)))
+
+(defmethod print-dup Instance [x w]
+  (->> (map pr-str (.-elems x))
+       (string/join ", ")
+       (format "(%s %s)" (.-tag x))
        (.write w)))
 
 (base/import-types)
+
+(defn type [x]
+  (if (instance? Tagged x)
+    (.getType x)
+    (-> x c/type .getSimpleName symbol Const.)))
 
 (defn container-intern-impl [tag args sig]
   `(def/intern-type-sig '~(u/resolve-sym tag)
      ~(u/curry #(Arrow. % %2) (into args [sig]))))
 
-(defn private-classname [tag]
-  (symbol (str (namespace-munge *ns*) ".__private." tag)))
-
-(defn container-deftype-impl [tag classname args]
-  `(deftype*
-     ~(impl/type-name tag)
-     ~classname
-     ~args
-     :implements
-     [clojure.lang.Indexed
-      lift.lang.type.impl.Show
-      lift.lang.type.impl.Type]
-     (nth [_# i#] (nth ~args i#))
-     (-show [_#]
-       (format "(%s %s)" ~(str tag) (string/join " " (map pr-str ~args))))))
-
 (defn prj-name [tag]
   (symbol (str "-prj-" (name tag))))
 
-(defn container-prj-impl [tag classname sig arglist args]
-  `{:prj {:isa? (list `instance? ~classname)
-          :fs (mapv (fn [i# t#]
-                      (Prim.
-                       (list 'fn '~(prj-name tag) ['~'x] (list 'nth '~'x i#))
-                       (Forall. (base/ftv ~sig) (Arrow. ~sig t#))))
-                    (range)
-                    ~args)}})
+(defn container-prj-impl [tag sig arglist args]
+  (let [tag' (u/resolve-sym tag)]
+    `((lift.lang.Instance/resetProjections '~tag')
+      ~@(mapv (fn [i t]
+                `(lift.lang.Instance/addProjection
+                  '~tag'
+                  (Prim.
+                   (fn ~(prj-name tag) [x#] (.nth x# ~i))
+                   (Forall. (base/ftv ~sig) (Arrow. ~sig ~t)))))
+              (range)
+              args))))
 
-(defn container-ctor-impl [tag classname sig arglist args]
-  `(defn ~(with-meta tag (container-prj-impl tag classname sig arglist args))
-     ~arglist
-     (new ~classname ~@arglist)))
+(defn container-ctor-impl [tag sig arglist args]
+  `(~@(container-prj-impl tag sig arglist args)
+    (defn ~tag
+      ~arglist
+      (Instance. ~sig '~(u/resolve-sym tag) ~arglist))))
 
 (p/defn container-arg
   ([[Var a]] a)
@@ -65,15 +66,14 @@
 (defn container-impl [part sig]
   (let [tag (symbol (name (.-tag part)))
         args (.-args part)
-        arglist (mapv container-arg args)
-        classname (private-classname tag)]
-    [(container-intern-impl tag args sig)
-     (container-deftype-impl tag classname arglist)
-     (impl/prn-impl classname)
-     (container-ctor-impl tag classname sig arglist args)]))
+        arglist (mapv container-arg args)]
+    `[~(container-intern-impl tag args sig)
+      ~@(container-ctor-impl tag sig arglist args)]))
 
 (defn value-impl [tag sig]
-  (let [obj (reify Show (-show [_] (name tag)))]
+  (let [obj (reify
+              Show (-show [_] (name tag))
+              Tagged (getType [_] sig))]
     `[(def ~tag ~obj)
       ~(impl/prn-impl (class obj))
       (def/intern-type-sig '~(u/resolve-sym tag) ~sig)]))
@@ -94,21 +94,18 @@
           (or (:sum-cons parsed) [(:value-cons parsed)]))
        ~sig)))
 
-(defn private-ctor-impl [tag classname dtor-sig arglist args ctor-fn]
-  `(defn ~(with-meta tag (container-prj-impl tag classname dtor-sig arglist args))
+(defn private-ctor-impl [tag dtor-sig arglist args ctor-fn]
+  `(defn ~(with-meta tag (container-prj-impl tag dtor-sig arglist args))
      ~arglist
-     (letfn [(~tag [x#] (new ~classname x#))]
+     (letfn [(~tag [& xs#] (Instance. dtor-sig ~tag xs#))]
        (~ctor-fn ~@arglist))))
 
 (defn private-container-impl [part sig ctor-sig ctor-fn]
   (let [tag (symbol (name (.-tag part)))
         args (.-args part)
-        arglist (mapv container-arg args)
-        classname (private-classname tag)]
+        arglist (mapv container-arg args)]
     [`(def/intern-type-sig '~(u/resolve-sym tag) ~ctor-sig)
-     (container-deftype-impl tag classname arglist)
-     (impl/prn-impl classname)
-     (private-ctor-impl tag classname sig arglist args ctor-fn)]))
+     (private-ctor-impl tag sig arglist args ctor-fn)]))
 
 (defn private-data* [ctor-sig ctor-fn decl]
   (let [{:keys [type-cons value-cons] :as parsed} (def/parse-data-decl decl)

@@ -14,8 +14,10 @@
    [lift.lang.type.def :as def]
    [lift.lang.defn :as defn]
    [lift.lang.case :as case]
-   [clojure.spec.alpha :as s]))
+   [clojure.spec.alpha :as s]
+   [lift.lang.type.data :as data]))
 
+(base/import-container-types)
 (base/import-syntax-types)
 (base/import-type-types)
 ;; requirements of interfaces:
@@ -158,37 +160,49 @@
        (infer/intern ~pred ~(impl-dict pred sub impls))
        '~pred)))
 
-(let [impls (atom {})]
-  (defn defn-impl-= [t f]
-    (swap! impls assoc t f))
-  (defn = [a]
-    (get @impls a)))
+(defn no-impl-error [impl a]
+  (throw (ex-info (format "No impl for %s %s" impl a)
+                  {:ex-type ::no-impl :impl impl :type a})))
 
-
-;; (defn r= [x y]
-;;   (ana/type x)
-;;   )
-
-;; (defn t: [x]
-
-;;   )
-;; (type lift.lang.__private.Just)
-
-;; (require '[lift.lang :refer [Just Nothing]])
-
-;; (defn-impl-= 'Maybe
+;; (require '[lift.lang :refer [Just Nothing Left Right True False]])
+;; (defmulti  = identity)
+;; (defmethod = 'Long  [_] (fn [x y] (c/= x y)))
+;; (defmethod = 'lift.lang/Maybe [_]
 ;;   (fn [a]
-;;     (if-let [= (= a)]
-;;       (fn [x y]
-;;         (case/pcase [x y]
-;;           [(Just x) (Just y)] (= x y)
-;;           [Nothing   Nothing] 1
-;;           [_         _      ] 2))
-;;       (throw (ex-info (format "No impl for %s %s" '= a)
-;;                       {:ex-type ::no-impl :impl '= :type a})))))
+;;     (fn [x y]
+;;       (case/pcase [x y]
+;;         [(Just x) (Just y)] ((= a) x y)
+;;         [Nothing   Nothing] True
+;;         [_         _      ] False))))
 
-;; lift.lang.
-;; (defn-impl-= 'Long
-;;   (fn [x y] (c/= x y)))
+;; ;; (defmethod = 'Either [_]
+;; ;;   (fn [a b]
+;; ;;     (if-let [a= (= a)]
+;; ;;       (if-let [b= (= b)]
+;; ;;         (fn [x y]
+;; ;;           (case/pcase [x y]
+;; ;;             [(Left  x) (Left  y)] (= x y)
+;; ;;             [(Right x) (Right y)] (= x y)
+;; ;;             [_         _        ] false))
+;; ;;         (no-impl-error '= b))
+;; ;;       (no-impl-error '= a))))
 
-;; (((= 'Maybe) 'Long) (Just 1) (Just 1))
+;; (defmethod = :default [_]
+;;   (fn [x y]
+;;     (let [tx (data/type x)]
+;;       (cond (instance? Const tx)
+;;             (if-let [= (= (:x tx))]
+;;               (= x y)
+;;               (no-impl-error '= tx))
+;;             (instance? Container tx)
+;;             (if-let [tag= (= (:tag tx))]
+;;               (if-let [args= (apply tag= (:args tx))]
+;;                 (args= x y)
+;;                 (no-impl-error '= tx))
+;;               (no-impl-error '= tx))
+;;             :else
+;;             (no-impl-error '= tx)))))
+
+;; ((= :default) (Just (Just (Just 1))) (Just (Just (Just 1))))
+
+;; ;; (((= 'Maybe) 'Long) (Just 1) (Just 1))
