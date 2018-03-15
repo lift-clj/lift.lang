@@ -33,8 +33,6 @@
   (let [t (c/type x)]
     (or (types t) t)))
 
-(def interfaces (atom {}))
-
 (defn uncurry [f]
   (fn [& args]
     (reduce #(% %2) f args)))
@@ -75,7 +73,7 @@
   `(infer/intern '~(u/resolve-sym f)
                  (Forall. (type/ftv ~sig) (Predicated. [~pred] ~sig))))
 
-(defn interface
+(defn interface*
   {:style/indent :defn}
   [t fn-list-defaults?]
   (let [[class & as] t
@@ -90,6 +88,11 @@
           fns)
        (infer/intern '~class ~pred)
        '~t)))
+
+(defmacro interface
+  {:style/indent :defn}
+  [type & decl]
+  (interface* type decl))
 
 (def clojure-imports
   '#{Keyword Ratio Symbol})
@@ -160,49 +163,71 @@
        (infer/intern ~pred ~(impl-dict pred sub impls))
        '~pred)))
 
+(interface (Madeup a b)
+  (madeup (a -> b -> Boolean)))
+
 (defn no-impl-error [impl a]
-  (throw (ex-info (format "No impl for %s %s" impl a)
+  (throw (ex-info (format "No impl for %s %s" impl (pr-str a))
                   {:ex-type ::no-impl :impl impl :type a})))
 
-;; (require '[lift.lang :refer [Just Nothing Left Right True False]])
-;; (defmulti  = identity)
-;; (defmethod = 'Long  [_] (fn [x y] (c/= x y)))
-;; (defmethod = 'lift.lang/Maybe [_]
-;;   (fn [a]
-;;     (fn [x y]
-;;       (case/pcase [x y]
-;;         [(Just x) (Just y)] ((= a) x y)
-;;         [Nothing   Nothing] True
-;;         [_         _      ] False))))
+(def interfaces (ref {}))
 
-;; ;; (defmethod = 'Either [_]
-;; ;;   (fn [a b]
-;; ;;     (if-let [a= (= a)]
-;; ;;       (if-let [b= (= b)]
-;; ;;         (fn [x y]
-;; ;;           (case/pcase [x y]
-;; ;;             [(Left  x) (Left  y)] (= x y)
-;; ;;             [(Right x) (Right y)] (= x y)
-;; ;;             [_         _        ] false))
-;; ;;         (no-impl-error '= b))
-;; ;;       (no-impl-error '= a))))
+(defn definterface* [name arglist])
 
-;; (defmethod = :default [_]
-;;   (fn [x y]
-;;     (let [tx (data/type x)]
-;;       (cond (instance? Const tx)
-;;             (if-let [= (= (:x tx))]
-;;               (= x y)
-;;               (no-impl-error '= tx))
-;;             (instance? Container tx)
-;;             (if-let [tag= (= (:tag tx))]
-;;               (if-let [args= (apply tag= (:args tx))]
-;;                 (args= x y)
-;;                 (no-impl-error '= tx))
-;;               (no-impl-error '= tx))
-;;             :else
-;;             (no-impl-error '= tx)))))
+(def RuntimeFallback (Object.))
+(require '[lift.lang :refer [Just Nothing Left Right True False]])
+(def = nil)
+(defmulti = identity)
+(defmethod = :default [_])
+(defmethod = 'Long  [_] (fn [x y] (c/= x y)))
+(defmethod = 'String  [_] (fn [x y] (c/= x y)))
+(defmethod = 'lift.lang/Maybe [_]
+  (fn [a]
+    (fn [x y]
+      (case/pcase [x y]
+        [(Just x) (Just y)] ((= a) x y)
+        [Nothing   Nothing] true
+        [_         _      ] false))))
 
-;; ((= :default) (Just (Just (Just 1))) (Just (Just (Just 1))))
+(defmethod = 'lift.lang/Either [_]
+  (fn [a b]
+    (fn [x y]
+      (case/pcase [x y]
+        [(Left  x) (Left  y)] ((= a) x y)
+        [(Right x) (Right y)] ((= b) x y)
+        ;; TODO: this ^^ implies there must be some type analysis to see which
+        ;; a/b are involved
+        ;; There will be type analysis done here, when we type-check the
+        ;; definition.
+        [_         _        ] false))))
 
-;; ;; (((= 'Maybe) 'Long) (Just 1) (Just 1))
+(infer/resolve `madeup)
+
+(defmethod = RuntimeFallback [_]
+  (fn [x y]
+    (let [tx (data/type x)]
+      (cond (instance? Const tx)
+            (if-let [= (= (:x tx))]
+              (= x y)
+              (no-impl-error '= tx))
+            (instance? Container tx)
+            (let [{:keys [tag args]} tx]
+              (if-let [tag= (= tag)]
+                (let [argtypes (map (fn [a] (if (= a) a RuntimeFallback)) args)]
+                  ((apply tag= argtypes) x y))
+                (no-impl-error '= tx)))
+            :else
+            (no-impl-error '= tx)))))
+
+((= RuntimeFallback) (Just 1) (Just 1))
+((= RuntimeFallback) (Just (Just (Just Nothing))) (Just (Just (Just 1))))
+
+((= RuntimeFallback) (Right "Error") (Right "Error1"))
+((= RuntimeFallback) (Right 0) (Right 0))
+((= RuntimeFallback) (Left 1) (Left 1))
+((= RuntimeFallback) (Left 2) (Left 1))
+((= RuntimeFallback) (Left 1) (Right 1))
+((= RuntimeFallback) (Right 1) (Left 1))
+
+
+;; (((= 'Maybe) 'Long) (Just 1) (Just 1))

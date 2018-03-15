@@ -1,7 +1,7 @@
 (ns lift.lang.case-test
   (:require
    [clojure.test :refer [deftest is use-fixtures]]
-   [lift.lang :refer [data Just Nothing True False]]
+   [lift.lang :refer [data Just Nothing Left Right True False]]
    [lift.lang.case :as case]
    [clojure.walk :as walk]
    [lift.lang.util :as u])
@@ -98,64 +98,71 @@
          (case/case* x '([_ (Pair a b)] a)))))
 
 (deftest Maybe-equals-test
-  (is (= (eval
-          (quo
-           '(clojure.core/let [a1 (lift.lang.case/Tuple2 (Just 1) (Just 2))]
-              (if (lift.lang.case/tagged? a1 'lift.lang.case/Tuple2)
-                (let* [a2 (~(prj `case/Tuple2 0) a1)
-                       a3 (~(prj `case/Tuple2 1) a1)]
-                  (if (lift.lang.case/tagged? a2 'lift.lang/Just)
-                    (let* [a4 (~(prj `Just 0) a2)]
-                      (let* [x a4]
-                        (if (lift.lang.case/tagged? a3 'lift.lang/Just)
-                          (let* [a5 (~(prj `Just 0) a3)]
-                            (let* [y a5] (= x y)))
-                          (if (lift.lang.prim/eq Nothing a2)
-                            (if (lift.lang.prim/eq Nothing a3)
-                              True
-                              (lift.lang.type/unmatched-case-error a3))
-                            (let* [_ a2] (let* [_ a3] False))))))
-                    (if (lift.lang.prim/eq Nothing a2)
-                      (if (lift.lang.prim/eq Nothing a3)
-                        True
-                        (lift.lang.type/unmatched-case-error a3))
-                      (let* [_ a2] (let* [_ a3] False)))))
-                (lift.lang.type/unmatched-case-error a1)))))
-         (case/case*
-          '[(Just 1) (Just 2)]
-          '([(Just x) (Just y)] (= x y)
-            [Nothing   Nothing] True
-            [_         _      ] False))))
-  (is (= false
-         (eval (case/case*
-                '[(Just 1) (Just 2)]
-                '([(Just x) (Just y)] (= x y)
-                  [Nothing   Nothing] True
-                  [_         _      ] False)))))
-  (is (= true
-         (eval (case/case*
-                '[Nothing Nothing]
-                '([(Just x) (Just y)] (= x y)
-                  [Nothing   Nothing] true
-                  [_         _      ] false)))))
-  (is (= true
-         (case/pcase [(Just 1) (Just 1)]
-           [(Just x) (Just y)] (= x y)
-           [Nothing   Nothing] True
-           [_         _      ] False)))
 
-  (is (false? (case/pcase [(Just 1) Nothing]
-                [(Just x) (Just y)] (= x y)
-                [Nothing   Nothing] true
-                [_         _      ] false)))
+  (is (false?
+       (case/pcase [(Just 1) (Just 2)]
+         [(Just x) (Just y)] (= x y)
+         [Nothing   Nothing] true
+         [_         _      ] false)))
 
-  (is (false? (case/pcase [Nothing (Just 1)]
-                [(Just x) (Just y)] (= x y)
-                [Nothing   Nothing] true
-                [_         _      ] false)))
+  (is (true?
+       (case/pcase [Nothing Nothing]
+         [(Just x) (Just y)] (= x y)
+         [Nothing   Nothing] true
+         [_         _      ] false)))
 
-  (is (true? (case/pcase [Nothing Nothing]
-               [(Just x) (Just y)] (= x y)
-               [Nothing   Nothing] true
-               [_         _      ] false)))
-  )
+  (is (true?
+       (case/pcase [(Just 1) (Just 1)]
+         [(Just x) (Just y)] (= x y)
+         [Nothing   Nothing] true
+         [_         _      ] false)))
+
+  (is (false?
+       (case/pcase [(Just 1) Nothing]
+         [(Just x) (Just y)] (= x y)
+         [Nothing   Nothing] true
+         [_         _      ] false)))
+
+  (is (false?
+       (case/pcase [Nothing (Just 1)]
+         [(Just x) (Just y)] (= x y)
+         [Nothing   Nothing] true
+         [_         _      ] false))))
+
+(deftest Either-equals-test
+
+  (is (true?
+       (case/pcase [(Left 1) (Left 1)]
+         [(Left  x) (Left  y)] (= x y)
+         [(Right x) (Right y)] (= x y)
+         [_         _      ] false)))
+
+  (is (false?
+       (case/pcase [(Left 1) (Left 2)]
+         [(Left  x) (Left  y)] (= x y)
+         [(Right x) (Right y)] (= x y)
+         [_         _      ] false)))
+
+  (is (true?
+       (case/pcase [(Right 1) (Right 1)]
+         [(Left  x) (Left  y)] (= x y)
+         [(Right x) (Right y)] (= x y)
+         [_         _      ] false)))
+
+  (is (false?
+       (case/pcase [(Right 1) (Right 2)]
+         [(Left  x) (Left  y)] (= x y)
+         [(Right x) (Right y)] (= x y)
+         [_         _      ] false)))
+
+  (is (false?
+       (case/pcase [(Left 1) (Right 1)]
+         [(Left  x) (Left  y)] (= x y)
+         [(Right x) (Right y)] (= x y)
+         [_         _      ] false)))
+
+  (is (false?
+       (case/pcase [(Right 1) (Left 1)]
+         [(Left  x) (Left  y)] (= x y)
+         [(Right x) (Right y)] (= x y)
+         [_         _      ] false))))

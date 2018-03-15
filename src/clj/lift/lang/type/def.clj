@@ -31,12 +31,12 @@
      (or (some->> s (try-ns-resolve ns) u/->sym) s)
      (or (some->> s (try-ns-resolve ns) u/->sym)
          (let [s' (symbol (name (ns-name ns)) (name s))]
-           (or (when (get-type @infer/env s') s')
-               (when (find-type @infer/env s') s')))
+           (or (when (get-type @env/env s') s')
+               (when (find-type @env/env s') s')))
          (some->> s (try-ns-resolve 'lift.lang) u/->sym)
          (let [s' (symbol "lift.lang" (name s))]
-           (or (when (get-type @infer/env s') s')
-               (when (find-type @infer/env s') s')))
+           (or (when (get-type @env/env s') s')
+               (when (find-type @env/env s') s')))
          (u/ns-qualify s))))
   ([s]
    (resolve-sym *ns* s)))
@@ -203,16 +203,16 @@
 
 (defmacro prim [t]
   `(let [t# (Const. '~t)]
-     (infer/intern '~t t#)
+     (env/intern '~t t#)
      t#))
 
 (defn intern-type-only [type]
-  (infer/intern type (Forall. (base/ftv type) type))
+  (env/intern type (Forall. (base/ftv type) type))
   type)
 
 (defn intern-type-sig [type sig]
   (let [sigma (Forall. (base/ftv sig) sig)]
-    (infer/intern type sigma)
+    (env/intern type sigma)
     (base/$ type sigma)))
 
 (defmacro intern-signature
@@ -232,9 +232,9 @@
         name     (resolve-sym name)
         ann?     (when ann? (construct ann?))
         sigma1   (when ann? (forall (base/ftv ann?) ann?))
-        _        (infer/untern name)
+        _        (env/untern name)
         init'    (u/macroexpand-all init)
-        _Gamma        (assoc @infer/env name (Forall. #{} (Var. 'a)))
+        _Gamma        (assoc @env/env name (Forall. #{} (Var. 'a)))
         [s1 syn] (infer/checks _Gamma init')
         [e1 t1]  (base/substitute syn s1)
         sigma2   (forall (base/ftv t1) t1)]

@@ -1,9 +1,9 @@
 (ns lift.lang.case
   (:refer-clojure :exclude [var?])
   (:require
+   [clojure.spec.alpha :as s]
    [lift.lang.type.data :refer [data]]
-   [lift.lang.type :as t]
-   [clojure.spec.alpha :as s])
+   [lift.lang.util :as u])
   (:import
    [lift.lang Instance]))
 
@@ -40,6 +40,9 @@
 
 (defn tagged? [x tag]
   (and (instance? Instance x) (.isa x tag)))
+
+(defn unmatched-case-error [x]
+  (throw (ex-info "Unmatched Case" {:type :unmatched-case-error :x x})))
 
 (declare case-tree)
 
@@ -100,15 +103,22 @@
           (update n :else case-tree x m e l))))
 
 (defn irrefutable? [{:keys [type then else expr]}]
-  (cond (= type :bind)
-        (if (some? expr) true (recur then))
-        (= type :ltrl)
-        (if (some? expr) true (recur else))))
+  (or (when (= type :bind)
+        (if (some? expr)
+          true
+          (irrefutable? then)))
+      (if else
+        (recur else))))
 
 (defn default-case [{:keys [type then else] :as n} default]
-  (when n
+  (if n
     (if (irrefutable? else)
-      (update n :then default-case else)
+      (if then
+        (let [else (default-case else default)]
+          (-> n
+              (update :then default-case else)
+              (assoc :else else)))
+        n)
       (if then
         (let [n' (update n :then default-case default)]
           (if else
@@ -118,25 +128,24 @@
               n')))
         (if default
           (update n :else default-case default)
-          n)))))
+          n)))
+    default))
 
 (defmulti emit-case :type)
 
 (defmethod emit-case :dest [{:keys [test thex prjs then else]}]
-  (try
-    (let [tag (t/resolve-sym test)]
-      `(if (tagged? ~thex '~tag)
-         (let* [~@(->> prjs
-                       (map-indexed (fn [i gs]
-                                      (let [p (Instance/getProjection tag i)]
-                                        [gs `(~p ~thex)])))
-                       (apply concat))]
-           ~(emit-case then))
-         ~(emit-case else)))
-    (catch NullPointerException _
-      (throw (ex-info "Could not resolve constructor for destructure"
-                      {:type ::unresolved-type-destructure
-                       :ctor test})))))
+  (if-let [tag (some-> test resolve u/->sym)]
+    `(if (tagged? ~thex '~tag)
+       (let* [~@(->> prjs
+                     (map-indexed (fn [i gs]
+                                    (let [p (Instance/getProjection tag i)]
+                                      [gs `(~p ~thex)])))
+                     (apply concat))]
+         ~(emit-case then))
+       ~(emit-case else)))
+  (throw (ex-info "Could not resolve constructor for destructure"
+                  {:type ::unresolved-type-destructure
+                   :ctor test})))
 
 (defmethod emit-case :bind [{:keys [bind thex then expr]}]
   `(let* [~@(mapcat (juxt identity (constantly thex)) bind)]
@@ -147,7 +156,7 @@
      ~(if then (emit-case then) expr)
      ~(if else
         (emit-case else)
-        `(t/unmatched-case-error ~thex))))
+        `(unmatched-case-error ~thex))))
 
 (defmethod emit-case :uerr [{:keys [expr]}]
   expr)
@@ -160,7 +169,7 @@
                  (reduce (fn [tree [pattern expr]]
                            (case-tree tree gs pattern expr nil))
                          nil))
-            (default-case {:type :uerr :expr `(t/unmatched-case-error ~gs)})
+            (default-case {:type :uerr :expr `(unmatched-case-error ~gs)})
             (emit-case)))))
 
 (defmacro pcase [x & pattern-exprs]

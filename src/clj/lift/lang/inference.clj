@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [intern resolve])
   (:require
    [lift.f.functor :as f]
+   [lift.lang.env :refer :all]
    [lift.lang.pattern :as p]
    [lift.lang.unification :as unify :refer [compose unify]]
    [lift.lang.util :as u]
@@ -12,23 +13,6 @@
    [lift.lang.type.impl :as impl])
   (:import
    [clojure.lang Fn]))
-
-(defonce env (ref {}))
-
-(defn intern [name type]
-  (dosync (alter env assoc name type))
-  ($ name type))
-
-(defn untern [name]
-  (dosync (alter env dissoc name))
-  nil)
-
-(defn resolve
-  ([name]
-   (resolve @env name))
-  ([_Gamma name]
-   (or (if-let [t (get _Gamma name)] [name t])
-       (let [name' (u/resolve-sym name)] (if-let [t (get _Gamma name')] [name' t])))))
 
 (base/import-container-types)
 (base/import-type-types)

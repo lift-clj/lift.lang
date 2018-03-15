@@ -3,7 +3,6 @@
   (:require
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
-   [lift.lang.type :as t]
    [lift.lang.type.base :as base]
    [lift.lang.type.def :as def]
    [lift.lang.type.impl :as impl]
