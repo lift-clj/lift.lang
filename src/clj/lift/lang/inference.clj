@@ -3,7 +3,7 @@
   (:require
    [lift.f.functor :as f]
    [lift.lang.env :refer :all]
-   [lift.lang.pattern :as p]
+   [lift.lang.defn :as p]
    [lift.lang.unification :as unify :refer [compose unify]]
    [lift.lang.util :as u]
    [lift.lang.type.base :as base :refer [id $]]

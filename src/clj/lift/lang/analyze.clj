@@ -2,13 +2,10 @@
   (:refer-clojure :exclude [type])
   (:require
    [clojure.core :as c]
-   [clojure.set :as set]
    [clojure.spec.alpha :as s]
    [lift.f.functor :as f]
-   [lift.lang.pattern :as p]
    [lift.lang.type.base :as base :refer [$]]
    [lift.lang.type.impl :refer [ana]]
-   [lift.lang.util :refer [resolve-sym]]
    [lift.lang.util :as u])
   (:import
    [lift.lang.type.impl Type]))
@@ -134,12 +131,11 @@
     (recur (Apply. op (first args)) (rest args))
     op))
 
-(p/defn type
-  ([[Literal a]]
-   (Const. (-> a c/type .getSimpleName symbol)))
-  ([x]
-   (throw
-    (Exception. (str "Cannot parse type of non-Literal: " (pr-str x))))))
+(defn type [x]
+  (if (instance? Literal x)
+    (-> x :a c/type .getSimpleName symbol Const.)
+    (throw
+     (Exception. (str "Cannot parse type of non-Literal: " (pr-str x))))))
 
 (def -parse nil)
 (defmulti -parse (fn [t expr] t))

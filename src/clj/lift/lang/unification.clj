@@ -2,8 +2,7 @@
   (:require
    [clojure.set :refer [difference union]]
    [lift.f.functor :as f]
-   [lift.lang.analyze :as ana]
-   [lift.lang.pattern :as p]
+   [lift.lang.defn :as p]
    [lift.lang.type.base :as base :refer [id]]
    [lift.lang.type.impl :refer [cata]]
    [lift.lang.util :as u]))
@@ -65,17 +64,17 @@
   (reduce (fn [s [a b]] (compose (unify a b) s)) id (partition 2 1 coll)))
 
 (p/defn rewrite-row
-  ([l t [RowEmpty _]]
+  ([l t (RowEmpty _)]
    (throw (Exception. (format "Row does not contain label %s" (pr-str l)))))
 
-  ([l t [Row l' t' tail] | (= l l')]
-   [(trampoline unify t t') tail])
+  ([l t (Row l' t' tail)]
+   (if (= l l')
+     [(trampoline unify t t') tail]
+     (let [[s tail'] (rewrite-row l t tail)]
+       [s (Row. l' t' tail')])))
 
-  ([l t [Row l' t' tail]]
-   (let [[s tail'] (rewrite-row l t tail)]
-     [s (Row. l' t' tail')]))
-
-  ([l t [Var a]] ; this is the case where r is a tv
+  ([l t (Var a)]
+   ;; this is the case where r is a tv
    (let [row (Row. l t (Var. a))]
      [(base/sub {a row}) row]))
 

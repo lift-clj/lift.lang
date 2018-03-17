@@ -4,15 +4,46 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [lift.lang.type.base :as base]
-   [lift.lang.type.def :as def]
+   [lift.lang.type.spec :as spec]
+   [lift.lang.env :as env]
    [lift.lang.type.impl :as impl]
-   [lift.lang.pattern :as p]
    [lift.lang.util :as u]
-   [clojure.java.io :as io]
    [clojure.core :as c])
   (:import
    [lift.lang Instance Tagged]
    [lift.lang.type.impl Show]))
+
+(s/def ::constructor
+  (s/alt :name ::spec/name
+         :app  ::spec/app))
+
+(s/def ::product
+  (s/cat :type-cons ::constructor := #{'=} :value-cons ::spec/app))
+
+(s/def ::sum
+  (s/cat :type-cons ::constructor
+         := #{'=}
+         :sum-cons (s/cat :type ::spec/type-re
+                          :more (s/+ (s/cat :| #{'|} :type ::spec/type-re)))))
+
+(s/def ::data
+  (s/or :product ::product :sum ::sum))
+
+(defn parse [[t ast]]
+  (case t
+    :product
+    (let [{:keys [value-cons]} ast]
+      (-> ast
+          (update :type-cons spec/parse*)
+          (assoc :value-cons (spec/parse* [:app value-cons]))
+          (dissoc :=)))
+    :sum
+    (let [{:keys [sum-cons]} ast]
+      (-> ast
+          (update :type-cons spec/parse*)
+          (assoc :sum-cons (map spec/parse* (cons (:type sum-cons)
+                                                  (map :type (:more sum-cons)))))
+          (dissoc :=)))))
 
 (defmethod print-method Instance [x w]
   (->> (map pr-str (.-elems x))
@@ -34,8 +65,7 @@
     (-> x c/type .getSimpleName symbol Const.)))
 
 (defn container-intern-impl [tag args sig]
-  `(def/intern-type-sig '~(u/resolve-sym tag)
-     ~(u/curry #(Arrow. % %2) (into args [sig]))))
+  `(env/intern '~(u/resolve-sym tag) ~(u/curry #(Arrow. % %2) (into args [sig]))))
 
 (defn prj-name [tag]
   (symbol (str "-prj-" (name tag))))
@@ -58,13 +88,14 @@
       ~arglist
       (Instance. ~sig '~(u/resolve-sym tag) ~arglist))))
 
-(p/defn container-arg
-  ([[Var a]] a)
-  ([_] (gensym)))
+(defn container-arg [x]
+  (if (instance? Var x)
+    (:a x)
+    (gensym)))
 
 (defn container-impl [part sig]
-  (let [tag (symbol (name (.-tag part)))
-        args (.-args part)
+  (let [tag (-> part :tag :x name symbol)
+        args (:args part)
         arglist (mapv container-arg args)]
     `[~(container-intern-impl tag args sig)
       ~@(container-ctor-impl tag sig arglist args)]))
@@ -75,16 +106,21 @@
               Tagged (getType [_] sig))]
     `[(def ~tag ~obj)
       ~(impl/prn-impl (class obj))
-      (def/intern-type-sig '~(u/resolve-sym tag) ~sig)]))
+      (env/intern '~(u/resolve-sym tag) ~sig)]))
+
+(defn Maybe [a]
+  (Instance. (Const. 'Type) 'Maybe [(Var. a)]))
+
+(defn type-ctor-impl [])
 
 (defn data* [decl]
-  (let [{:keys [type-cons] :as parsed} (def/parse-data-decl decl)
-        args (mapv :a (.-args type-cons))
-        tag (symbol (name (.-tag type-cons)))
+  (let [{:keys [type-cons] :as parsed} (parse (u/assert-conform ::data decl))
+        args (mapv :a (:args type-cons))
+        tag (-> type-cons :tag :x name symbol)
         type-expr (apply list tag args)
-        sig (def/type-signature type-expr)]
+        sig (spec/parse type-expr)]
     `(do
-       (def/intern-type-only ~sig)
+       (env/intern ~sig ~sig)
        ~@(mapcat
           (fn [part]
             (if (instance? Container part)
@@ -100,22 +136,22 @@
        (~ctor-fn ~@arglist))))
 
 (defn private-container-impl [part sig ctor-sig ctor-fn]
-  (let [tag (symbol (name (.-tag part)))
-        args (.-args part)
+  (let [tag (-> part :tag :x name symbol)
+        args (:args part)
         arglist (mapv container-arg args)]
-    [`(def/intern-type-sig '~(u/resolve-sym tag) ~ctor-sig)
+    [`(env/intern '~(u/resolve-sym tag) ~ctor-sig)
      (private-ctor-impl tag sig arglist args ctor-fn)]))
 
 (defn private-data* [ctor-sig ctor-fn decl]
-  (let [{:keys [type-cons value-cons] :as parsed} (def/parse-data-decl decl)
-        args (mapv :a (.-args type-cons))
-        tag (symbol (name (.-tag type-cons)))
+  (let [{:keys [type-cons value-cons] :as parsed} (parse decl)
+        args (mapv :a (:args type-cons))
+        tag (-> type-cons :tag :x name symbol)
         type-expr (apply list tag args)
-        sig (def/type-signature type-expr)
-        ctor-sig (def/type-signature ctor-sig)]
+        sig (spec/parse type-expr)
+        ctor-sig (spec/parse ctor-sig)]
     ;; TODO: *must* check only one type param, and not a value/sumtype
     `(do
-       (def/intern-type-only ~sig)
+       (env/intern ~sig ~sig)
        ~@(private-container-impl value-cons sig ctor-sig ctor-fn)
        ~sig)))
 

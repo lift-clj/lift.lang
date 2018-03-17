@@ -5,7 +5,6 @@
    [lift.lang.signatures :as sig]
    [lift.lang.type :as type]
    [lift.lang.type.base :as base]
-   [lift.lang.type.impl :as impl]
    [lift.lang.unification :as unify]
    [lift.lang.util :as u]
    [lift.lang.analyze :as ana]
@@ -14,6 +13,7 @@
    [lift.lang.type.def :as def]
    [lift.lang.defn :as defn]
    [lift.lang.case :as case]
+   [lift.lang.type.spec :as spec]
    [clojure.spec.alpha :as s]
    [lift.lang.type.data :as data]))
 
@@ -25,6 +25,41 @@
 ;; pattern matching for impl?
 ;; what is the type of a thing at runtime?
 ;; does it matter that the underlying system has a different type?
+
+(s/def ::signature
+  (s/and seq? (s/cat :f simple-symbol? :sig ::spec/type-re)))
+
+(s/def ::default-impl
+  (s/and seq? (s/cat :f simple-symbol? :arglist vector? :expr any?)))
+
+(s/def ::match-impl
+  (s/and seq?
+         (s/cat :f simple-symbol?
+                :impls (s/+ (s/and seq? (s/cat :arglist vector? :expr any?))))))
+
+(s/def ::impl
+  (s/or :default ::default-impl :match ::match-impl))
+
+(s/def ::interface
+  (s/cat :fn-list (s/+ ::signature)
+         :default (s/? (s/and seq? (s/cat :default #{'default} :impls (s/+ ::impl))))))
+
+(defn parse [expr]
+  (let [c (s/conform ::interface expr)]
+    (if (s/invalid? c)
+      (throw
+       (Exception. (str "Invalid interface signature\n"
+                        (with-out-str (pprint expr))
+                        \newline
+                        (with-out-str (s/explain ::interface expr)))))
+      (reduce (fn [i {:keys [f arglist expr] :as x}]
+                (if (contains? i f)
+                  (assoc-in i [f :impl] (list 'fn arglist expr))
+                  (throw (Exception. (str "Default impl not in interface " f)))))
+              (->> (:fn-list c)
+                   (map (comp (juxt :f identity) #(update % :sig spec/parse)))
+                   (into {}))
+              (-> c :default :impls)))))
 
 (def types
   {Long 'Integer})
@@ -78,7 +113,7 @@
   [t fn-list-defaults?]
   (let [[class & as] t
         pred (Predicate. class (mapv #(Var. %) as))
-        fns (sig/parse-fn-list-default fn-list-defaults?)]
+        fns  (parse fn-list-defaults?)]
     `(do
        ~@(map (fn [[f _]] `(declare ~f)) fns)
        ~@(mapcat
@@ -143,13 +178,12 @@
 (defn q1 [x] (list 'quote x))
 
 (defn impl-dict [pred sub impls]
-  (let [[t c] (u/assert-conform (s/or :default (s/coll-of ::sig/default-impl)
-                                      :match   (s/coll-of ::sig/match-impl))
-                                impls)
-        f     (case t
-                :default (partial non-match-impl pred sub)
-                :match   (partial match-impl pred sub))]
-    (into {} (map (juxt (comp q1 u/resolve-sym :f) f) c))))
+  (let [conformed (u/assert-conform (s/coll-of ::impl) impls)
+        f     (fn [[t c]]
+                (case t
+                  :default (non-match-impl pred sub c)
+                  :match   (match-impl pred sub c)))]
+    (into {} (map (juxt (comp q1 u/resolve-sym :f) f) conformed))))
 
 (defn impl [[tag & as] impls]
   (let [as     (map resolve-type-param as)

@@ -1,11 +1,17 @@
 (ns lift.lang.env
-  (:require [lift.lang.util :as u]))
+  (:require
+   [lift.lang.type.base :as base]
+   [lift.lang.util :as u])
+  (:import
+   [lift.lang.type.base Forall]))
 
 (defonce env (ref {}))
+(defonce specials (atom #{}))
 
 (defn intern [name type]
-  (dosync (alter env assoc name type))
-  nil)
+  (let [sigma (if (instance? Forall type) type (Forall. (base/ftv type) type))]
+    (dosync (alter env assoc name sigma))
+    sigma))
 
 (defn untern [name]
   (dosync (alter env dissoc name))

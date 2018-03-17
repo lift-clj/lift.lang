@@ -2,8 +2,9 @@
   (:require
    [clojure.java.shell :as sh]
    [clojure.tools.namespace.repl :refer [refresh]]
-   [lift.lang :as lift]
-   [lift.lang.inference :as infer]))
+   ;; [lift.lang :as lift]
+   ;; [lift.lang.inference :as infer]
+   ))
 
 (defn load-class [classname]
   (let [class-loader (clojure.lang.DynamicClassLoader.)

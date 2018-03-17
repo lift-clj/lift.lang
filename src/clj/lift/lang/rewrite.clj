@@ -2,7 +2,7 @@
   (:require
    [lift.f.functor :as f]
    [lift.lang.inference :as infer :refer [infer]]
-   [lift.lang.pattern :as p]
+   [lift.lang.defn :as p]
    [lift.lang.type.base :as base]
    [lift.lang.util :as u]
    [lift.lang.type.impl :as impl]

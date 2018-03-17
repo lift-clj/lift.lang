@@ -3,7 +3,7 @@
   (:require
    [clojure.core :as c]
    [clojure.spec.alpha :as s]
-   [lift.tools.loader :as loader]
+   [lift.lang.env :as env]
    [lift.lang.case :as case]))
 
 (c/defn vars [n]
@@ -36,6 +36,12 @@
 (s/def ::one-pattern  (s/cat :arglist ::args-pattern :expr any?))
 (s/def ::pattern      (s/and seq? ::one-pattern))
 
+(s/conform ::pattern
+           '([l t (Row l' t' tail)]
+             | (= l l')
+             [(trampoline unify t t') tail])
+           )
+
 (c/defn pattern-match? [decl]
   (s/valid? (s/coll-of ::pattern) decl))
 
@@ -63,4 +69,4 @@
 (defmacro special [name & decl]
   `(do
      (defmacro ~name ~@decl)
-     (let [v# (resolve '~name)] (swap! loader/specials conj v#) v#)))
+     (let [v# (resolve '~name)] (swap! env/specials conj v#) v#)))

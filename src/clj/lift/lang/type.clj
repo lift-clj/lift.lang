@@ -58,7 +58,7 @@
 ;; (lift.lang.type/def restrict (l -> {l a | r} ->  {| r}))
 
 (defmacro def [name sig]
-  `(def/intern-signature ~name ~sig))
+  `(env/intern ~name ~sig))
 
 ;; (defn constructor [tag args]
 ;;   `(fn ~tag ~args

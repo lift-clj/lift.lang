@@ -4,6 +4,7 @@
             [clojure.core.specs.alpha :as cs]
             [clojure.tools.reader.reader-types :as rt]
             [clojure.tools.reader :as r]
+            [lift.lang.env :refer [specials]]
             [lift.lang.inference :as infer]
             [lift.lang.type.base :as base]
             [lift.lang.rewrite :as rewrite]
@@ -15,8 +16,6 @@
             [clojure.set :as set]))
 
 (base/import-type-types)
-
-(defonce specials (atom #{}))
 
 (defonce loaded-libs (ref #{}))
 

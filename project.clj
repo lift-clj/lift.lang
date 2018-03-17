@@ -12,5 +12,6 @@
   :profiles
   {:dev
    {:source-paths ["dev"]
-    :injections [(require 'lift.middleware)]
-    :repl-options {:nrepl-middleware [lift.middleware/lift-repl]}}})
+    ;; :injections [(require 'lift.middleware)]
+    ;; :repl-options {:nrepl-middleware [lift.middleware/lift-repl]}
+    }})
