@@ -1,12 +1,10 @@
 (ns lift.lang.type.spec
   (:require
    [clojure.spec.alpha :as s]
-   [lift.lang.type.base :as base]
-   [lift.lang.util :as u]))
+   [lift.lang.util :as u])
+  (:import
+   [lift.lang Instance]))
 
-(base/import-syntax-types)
-(base/import-type-types)
-(base/import-container-types)
 
 (s/def ::unit #{()})
 
@@ -73,38 +71,61 @@
         :rec   ::record
         :pred  ::pred))
 
+;; (def Type (Instance. nil 'Type []))
+
+;; (defn Unit  []        (Instance. Type 'Unit []))
+;; (defn Var   [a]       (Instance. Type 'Var [a]))
+;; (defn Const [a]       (Instance. Type 'Const [a]))
+;; (defn App   [op args] (Instance. Type op args))
+;; (defn Arr   [a b]     (Instance. Type '-> [a b]))
+
+;; (defn Row
+;;   ([]
+;;    (Instance. Type 'RowEmpty []))
+;;   ([k v row]
+;;    (Instance. Type 'Row [k v row])))
+
+;; (defn Record [r]
+;;   (Instance. Type 'Record [r]))
+
+;; (defn Predicated [p e]
+;;   (Instance. Type 'Predicated [p e]))
+
+;; (defn Pred [op args]
+;;   (Instance. Type 'Pred [p e]))
+
 (defmulti parse* (fn [[tag]] tag))
 
-(defmethod parse* :unit [[tag expr]] (Unit.))
+(defmethod parse* :unit [[tag expr]] (Unit))
 
-(defmethod parse* :var [[tag expr]] (Var. expr))
+(defmethod parse* :var [[tag expr]] (Var expr))
 
-(defmethod parse* :name [[tag expr]] (Const. expr))
+(defmethod parse* :name [[tag expr]] (Const expr))
 
 (defmethod parse* :app [[tag {:keys [op args]}]]
-  (Container. (parse* op) (mapv parse* args)))
+  (App op (mapv parse* args)))
 
 (defmethod parse* :arrow [[tag {:keys [a b]}]]
-  (Arrow. (parse* a) (parse* (second b))))
+  (Arr (parse* a) (parse* (second b))))
 
 (defmethod parse* :tuple [[tag expr]]
-  (Container. (Const. 'Tuple) (mapv parse* expr)))
+  (Instance. Type 'Tuple (mapv parse* expr)))
 
 (defmethod parse* :list [[tag {:keys [a]}]]
-  (Container. (Const. 'List) [(parse* a)]))
+  (Instance. Type 'List [(parse* a)]))
 
 (defmethod parse* :vect [[tag {:keys [a]}]]
-  (Container. (Const. 'Vector) [(parse* a)]))
+  (Instance. Type 'Vector [(parse* a)]))
 
 (defmethod parse* :set [[tag {:keys [a]}]]
-  (Container. (Const. 'Set) [(parse* a)]))
+  (Instance. Type 'Set [(parse* a)]))
 
 (defmethod parse* :rec [[tag expr]]
-  (let [r (some-> expr (get '|) second (Var.))]
+  (let [r (some-> expr (get '|) second (Var))]
     (->> (dissoc expr '|)
          (map (fn [[k v]] [(parse* (s/conform ::reckey k)) (parse* v)]))
-         (reduce (fn [row [k v]] (Row. k v row)) (or r (RowEmpty.)))
-         (Record.))))
+         (reduce (fn [row [k v]] (Row k v row)) (or r (Row)))
+         (Record))))
 
 (defmethod parse* :pred [[tag {:keys [expr pred]}]]
   (let [preds (case (first pred) :a [(second pred)] :t (second pred))]

@@ -9,9 +9,10 @@
 (defonce specials (atom #{}))
 
 (defn intern [name type]
-  (let [sigma (if (instance? Forall type) type (Forall. (base/ftv type) type))]
-    (dosync (alter env assoc name sigma))
-    sigma))
+  ;; let sigma (if (instance? Forall type) type (Forall. (base/ftv type) type))
+  (dosync (alter env assoc name type))
+  ;;sigma
+  )
 
 (defn untern [name]
   (dosync (alter env dissoc name))
