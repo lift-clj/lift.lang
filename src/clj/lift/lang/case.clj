@@ -2,22 +2,19 @@
   (:refer-clojure :exclude [var?])
   (:require
    [clojure.spec.alpha :as s]
-   [lift.lang.type.data :refer [data]]
-   [lift.lang.util :as u])
-  (:import
-   [lift.lang Instance]))
+   [lift.lang.type.data :refer [data get-prj tagged?]]
+   [lift.lang.util :as u]))
 
-(data Tuple1 a = Tuple1 a)
-(data Tuple2 a b = Tuple2 a b)
-(data Tuple3 a b c = Tuple3 a b c)
-(data Tuple4 a b c d = Tuple4 a b c d)
-(data Tuple5 a b c d e = Tuple5 a b c d e)
-(data Tuple6 a b c d e f = Tuple6 a b c d e f)
-(data Tuple7 a b c d e f g = Tuple7 a b c d e f g)
-(data Tuple8 a b c d e f g h = Tuple8 a b c d e f g h)
-(data Tuple9 a b c d e f g h i = Tuple9 a b c d e f g h i)
-
-(def tpl `[Tuple1 Tuple2 Tuple3 Tuple4 Tuple5 Tuple6 Tuple7 Tuple8 Tuple9])
+(def tpl
+  '[lift.lang.type/Tuple1
+    lift.lang.type/Tuple2
+    lift.lang.type/Tuple3
+    lift.lang.type/Tuple4
+    lift.lang.type/Tuple5
+    lift.lang.type/Tuple6
+    lift.lang.type/Tuple7
+    lift.lang.type/Tuple8
+    lift.lang.type/Tuple9])
 
 (defn tuple
   ([vars] (tuple (count vars) vars))
@@ -37,9 +34,6 @@
 
 (defn gsym [& _]
   (gensym '_))
-
-(defn tagged? [x tag]
-  (and (instance? Instance x) (.isa x tag)))
 
 (defn unmatched-case-error [x]
   (throw (ex-info "Unmatched Case" {:type :unmatched-case-error :x x})))
@@ -138,8 +132,7 @@
     `(if (tagged? ~thex '~tag)
        (let* [~@(->> prjs
                      (map-indexed (fn [i gs]
-                                    (let [p (Instance/getProjection tag i)]
-                                      [gs `(~p ~thex)])))
+                                    (let [p (get-prj tag i)] [gs `(~p ~thex)])))
                      (apply concat))]
          ~(emit-case then))
        ~(emit-case else)))

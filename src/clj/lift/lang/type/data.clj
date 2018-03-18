@@ -1,17 +1,21 @@
 (ns lift.lang.type.data
   (:require
-   [clojure.core :as c]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [lift.lang.env :as env]
-   [lift.lang.type.impl :as impl]
-   [lift.lang.type.spec :as spec]
-   [lift.lang.util :as u])
-  (:import
-   [lift.lang Instance Tagged]
-   [lift.lang.type.impl Show]))
+   [lift.lang.util :as u]))
+
+(def TCon 'lift.lang.type/TCon)
+(def TVar 'lift.lang.type/TVar)
+(def TArr 'lift.lang.type/TArr)
+(def TApp 'lift.lang.type/TApp)
+(def Prim 'lift.lang.type/Prim)
+(def Forall 'lift.lang.type/Forall)
 
 (def projections (ref {}))
+
+(defn get-prj [tag i]
+  (get-in @projections [tag i]))
 
 (defprotocol ADT
   (tag [_])
@@ -112,7 +116,9 @@
          :app  ::app))
 
 (s/def ::product
-  (s/cat :type-cons ::constructor := #{'=} :value-cons ::app))
+  (s/cat :type-cons ::constructor
+         := #{'=}
+         :value-cons (s/alt :name ::name :app ::app)))
 
 (s/def ::sum
   (s/cat :type-cons ::constructor
@@ -128,13 +134,13 @@
 
 (defn parse-arg [[tag expr]]
   (case tag
-    :name (list 'Const (list 'quote expr))
-    :var  (list 'Var   (list 'quote expr))))
+    :name (list TCon (list 'quote expr))
+    :var  (list TVar (list 'quote expr))))
 
 (defn parse-type-ctor [[tag expr]]
   (case tag
-    :name (list 'Const expr)
-    :app  (u/curry (partial list 'Apply)
+    :name (list TCon expr)
+    :app  (u/curry (partial list TApp)
                    (cons (parse-arg (:op expr))
                          (map parse-arg (:args expr))))))
 
@@ -144,9 +150,9 @@
       (alter projections assoc '~tag'
              ~(mapv (fn [i t]
                       `(Prim
-                        (fn ~(prj-name tag) [x#] (nth x# ~i))
-                        (Forall (base/ftv ~(parse-type-ctor sig))
-                                (Arrow ~(parse-type-ctor sig) ~(parse-arg t)))))
+                        (fn ~(prj-name tag) [~'x] (nth ~'x ~i))
+                        (Forall (lift.lang.type/ftv ~(parse-type-ctor sig))
+                                (TArr ~(parse-type-ctor sig) ~(parse-arg t)))))
                     (range)
                     args)))))
 
@@ -167,7 +173,7 @@
     '~(u/resolve-sym tag)
     ~(->> (into (map parse-arg args)
                 [(parse-type-ctor sig)])
-          (u/curry (partial list 'Arrow)))))
+          (u/curry (partial list TArr)))))
 
 (defn container-impl [part type-cons]
   (let [tag     (-> part :op second)
@@ -183,14 +189,15 @@
 (defn type-ctor-impl [[tag expr]]
   (case tag
     :name
-    `((env/intern '~expr (Const 'Type))
-      (def ~expr (adt-impl '~expr nil)))
+    `((def ~expr (adt-impl '~expr nil))
+      (env/intern '~expr (TCon '~'Type)))
     :app
     (let [ctor (-> expr :op second)
           argl (mapv container-arg (:args expr))]
       `((env/intern '~ctor
-                    ~(u/curry (partial list 'Arrow)
-                              (map (fn [_] (list 'Const 'Type)) (cons 'Type argl))))
+                    ~(u/curry (partial list TArr)
+                              (map (fn [_] `(TCon '~'Type))
+                                   (cons 'Type argl))))
         (defn ~ctor ~argl (adt-impl '~ctor ~argl))))))
 
 (defn data* [decl]
@@ -198,6 +205,7 @@
         type-ctor (parse-type-ctor type-cons)
         sum-ctors (when-let [ctors (:sum-cons parsed)]
                     (cons (:type ctors) (map :type(:more ctors))))]
+    (prn (:value-cons parsed))
     `(do
        ~@(type-ctor-impl type-cons)
        ~@(mapcat
@@ -207,6 +215,9 @@
               (value-impl part type-ctor)))
           (or sum-ctors [(:value-cons parsed)]))
        ~type-ctor)))
+
+(defn tagged? [x tag]
+  (and (satisfies? ADT x) (= (tag x) tag)))
 
 ;; (defn private-ctor-impl [tag dtor-sig arglist args ctor-fn]
 ;;   `(defn ~(with-meta tag (container-prj-impl tag dtor-sig arglist args))
@@ -243,18 +254,3 @@
 ;;   {:style/indent :defn}
 ;;   [data-decl type-sig ctor-fn]
 ;;   (private-data* type-sig ctor-fn (rest data-decl)))
-
-;; (data Unit = Unit)
-
-(prim Var a)
-(prim Const a)
-(prim Apply e1 e2)
-(prim Arrow a b)
-
-(data Expr
-  = Var Symbol
-  | Const Symbol
-  | Apply Expr Expr
-  | Arrow Expr Expr)
-
-(data Maybe a = Just a | Nothing)
