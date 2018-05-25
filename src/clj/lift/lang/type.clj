@@ -27,6 +27,16 @@
   | TArr Type Type  ; a -> b
   | TApp Type Type) ; Maybe a
 
+(data Literal
+  = Int Integer
+  | Str String)
+
+(data Expr
+  = Lit Literal
+  | Sym Symbol
+  | App Expr Expr
+  | Lam Symbol Expr)
+
 (data Tuple1 a = Tuple1 a)
 (data Tuple2 a b = Tuple2 a b)
 (data Tuple3 a b c = Tuple3 a b c)

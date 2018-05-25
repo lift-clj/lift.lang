@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [type])
   (:require
    [clojure.core :as c]
-   [lift.lang.signatures :as sig]
    [lift.lang.type :as type]
    [lift.lang.type.base :as base]
    [lift.lang.unification :as unify]
@@ -72,37 +71,37 @@
   (fn [& args]
     (reduce #(% %2) f args)))
 
-(defn get-impl [d vars f sig arglist]
-  (let [sub (or (some->> arglist
-                         (map (fn [s a]
-                                (and (instance? Var s)
-                                     (contains? vars (:a s))
-                                     (type/sub {(:a s) (ana/type (Literal. a))})))
-                              (sig/arrseq sig))
-                         (filter identity)
-                         (seq)
-                         (apply unify/compose))
-                type/id)
-        d' (type/substitute d sub)]
-    (uncurry
-     (eval
-      (rewrite/emit
-       (rewrite/rewrite
-        @type/env
-        nil
-        (get (get @type/env d') (u/resolve-sym f))))))))
+;; (defn get-impl [d vars f sig arglist]
+;;   (let [sub (or (some->> arglist
+;;                          (map (fn [s a]
+;;                                 (and (instance? Var s)
+;;                                      (contains? vars (:a s))
+;;                                      (type/sub {(:a s) (ana/type (Literal. a))})))
+;;                               (sig/arrseq sig))
+;;                          (filter identity)
+;;                          (seq)
+;;                          (apply unify/compose))
+;;                 type/id)
+;;         d' (type/substitute d sub)]
+;;     (uncurry
+;;      (eval
+;;       (rewrite/emit
+;;        (rewrite/rewrite
+;;         @type/env
+;;         nil
+;;         (get (get @type/env d') (u/resolve-sym f))))))))
 
-(defn default-impl [f sig pred t impl]
-  (let [{:keys [arglist args]} (sig/arglist sig)]
-    `(defn ~f ~arglist
-       (let [impl# (or (get-impl ~pred
-                                 '~(set (rest t))
-                                 '~f
-                                 ~sig
-                                 ~(vec (remove #{'&} arglist)))
-                       ~impl
-                       )]
-         (apply impl# (apply concat ~args))))))
+;; (defn default-impl [f sig pred t impl]
+;;   (let [{:keys [arglist args]} (sig/arglist sig)]
+;;     `(defn ~f ~arglist
+;;        (let [impl# (or (get-impl ~pred
+;;                                  '~(set (rest t))
+;;                                  '~f
+;;                                  ~sig
+;;                                  ~(vec (remove #{'&} arglist)))
+;;                        ~impl
+;;                        )]
+;;          (apply impl# (apply concat ~args))))))
 
 (defn type-sig-impl [f sig pred]
   `(infer/intern '~(u/resolve-sym f)
@@ -208,6 +207,9 @@
 
 (defn definterface* [name arglist])
 
+(interface (Eq a)
+
+           )
 (def RuntimeFallback (Object.))
 (require '[lift.lang :refer [Just Nothing Left Right True False]])
 (def = nil)
